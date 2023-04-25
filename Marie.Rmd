@@ -70,7 +70,7 @@ ts_serie2 <- ts(serie2$new_cases,start = c(2021,31,12), frequency = 365)
 serie3 <- donnees_fr |> 
   filter(date>"2023-01-05")
 
-ts_serie3 <- ts(serie3$new_cases,start = c(2021,31,12), frequency = 365)
+ts_serie3 <- ts(serie3$new_cases,start = c(2023,2,5), frequency = 365)
 ```
 
 
