@@ -88,13 +88,43 @@ plot(ts_serie3)
 
 Grâce à cette division, nous allons pouvoir étudier chaque sous-série pertinemment.
 
+## Analyse de la première sous-série
+
+Nous avons décidé de nous focaliser sur la première sous-série. \
+Notre étude commence donc le 1er Mars 2020 jusqu'au 22 décembre 2021.
+
+Pour rappel, notre série présente une tendance à la hausse et une saisonnalité, mais celle-ci n'est pas régulière. En effet, les différentes hausses de nouveaux cas de covid dépendent des confinements et des mesures sanitaires mises en place.
+
+
+On va d'abord chercher à décrire notre série grâce à des indicateurs descriptifs simples.
+
+```{r}
+mean(ts_serie1)
+```
+Entre le 1er Mars 2020 et le 22 Décembre 2022, la moyenne des nouveaux cas de covids par jour était de 11 763 cas en France.
 
 
 ```{r}
-
+ts_serie1 |> 
+  ggtsdisplay(plot.type = "scatter")
 ```
 
 
+Nous allons essayer de transformer la série pour stabiliser la croissance exponentielle du nombre de nouveaux cas.
+
+```{r}
+ts_serie1_log <- log(ts_serie1)
+ts_serie1_log
+length(ts_serie1_log)
+length(ts_serie1)
+
+```
+# PROBLEME !!
+
+```{r}
+plot(ts_serie1_log)
+lines(ts_serie1,col="red")
+```
 
 
 
