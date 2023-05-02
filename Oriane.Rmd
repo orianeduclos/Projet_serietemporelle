@@ -7,6 +7,9 @@ date: "`r Sys.Date()`"
 ```{r}
 library(tidyverse)
 library(forecast)
+library(tidyquant)
+library(tseries)
+library(caschrono)
 ```
 
 
@@ -128,6 +131,19 @@ ts_serie1 |>
 Nous pouvons faire quelques observations sur le graphique de l'ACF. En effet, plusieurs autocorrélations présentent des valeurs significativement non nulles, ce qui signifie que la série chronologique n'est pas aléatoire. 
 
 
+### Transformation en données hebdomadaires 
+
+```{r}
+week <-  data.frame(Date = donnees_fr$date, New_cases = donnees_fr$new_cases)
+week <- week |> tq_transmute(select = New_cases,
+                             mutate_fun= apply.weekly,
+                             FUN = sum) 
+
+week <- week |> flexable()
+```
+
+
+
 ### Stationnarité
 
 Ensuite, nous cherchons à nous ramener à une série stationnaire. Pour cela, nous devons éliminer la tendance linéaire. Afin de stationariser notre série, nous allons utiliser l'opérateur diff. \
@@ -151,8 +167,15 @@ serie_lissee |>
 ```
 Grâce à notre différenciation, nous avons pu stationariser notre série et supprimer la tendance. 
 
+```{r}
+kpss.test(serie_lissee)
+ts.plot(serie_lissee, main = "Serie différenciée", col ="blue")
+```
 
-### Détection de l'autocorrélation partielle
+
+
+
+### Détection de l'autocorrélation partielle et identification des degrés p et q 
 
 Afin de détecter la présence d'autocorrélation partielle, nous allons utiliser la fonction pacf. Elle nous permet de mesurer l'aurocorrélation d'un signal pour un décalage k "indépendamment" des autocorrélations pour les décalages inférieurs. \
 Nous avons choisi d'utiliser cette fonction car le corrélogramme produit par la fonction ggdisplay montre des autocorrélations fortes à répétition.
@@ -162,6 +185,12 @@ Nous avons choisi d'utiliser cette fonction car le corrélogramme produit par la
 pacf(serie_lissee)
 ```
 
+
+```{r}
+acf2y(serie_lissee,lag.max = 15)
+```
+
+On choisit p=2 et q= 2 
 
 ## Sous serie par semaine 
 
@@ -179,7 +208,39 @@ ts_serie1 <- ts(serie1$new_cases,start = c(2020,1,3), frequency = 365)
 
 ### Estimation du modèle
 
-# ARIMA ?
+Afin de pouvoir estimer le modèle, nous avons utiliser la fonction auto.arima() du pakage forecast qui permet d'effectuer une modélisation automatique. En précisant les arguments trace=T et ic=aic, nous avons donner la main au logiciel R de selectionner le meilleur modèle sur la base du critère AIC 
+
+## ARIMA ?
+
+```{r}
+model_arima <- auto.arima(serie_lissee, trace=T, ic = "aic")
+```
+
+Modèle identifier : ARIMA(4,0,4)
+
+```{r}
+summary(model_arima)
+```
+
+```{r}
+t_stat(model_arima)
+```
+
+Le modèle n'est pas simplifiable
+
+## Validation du modèle (validation interne)
+
+```{r}
+Box.test(model_arima$residuals, lag = 10, type= "Ljung-Box")
+```
+Pas très efficae ?? Vous en pensez quoi ? p_value pas acceptable 
+
+
+```{r}
+checkresiduals(model_arima)
+```
+
+
 # ARMA ?
 
 ```{r}
