@@ -97,6 +97,7 @@ Grâce à cette division, nous allons pouvoir étudier chaque sous-série pertin
 ## Analyse de la première sous-série
 
 Nous avons décidé de nous focaliser sur la première sous-série. \
+Ce choix est expliqué grâce à notre connaissance des évènements durant cette année particulière. En effet, les confinements ont pu avoir des conséquences sur notre série et nos données.
 Notre étude commence donc le 1er Mars 2020 et s'étend jusqu'au 22 décembre 2021.
 
 Pour rappel, notre série présente une tendance à la hausse comme le montre le graphique ci-dessous. Elle présente aussi une saisonnalité, mais elle n'est pas régulière. En effet, les différentes hausses de nouveaux cas de covid dépendent des confinements et des mesures sanitaires mises en place.
@@ -119,12 +120,35 @@ Entre le 1er Mars 2020 et le 22 Décembre 2022, la moyenne des nouveaux cas de c
 ts_serie1 |> 
   ggtsdisplay(plot.type = "scatter",smooth=FALSE)
 ```
-Nous pouvons faire quelques observations sur le graphique de l'ACF. En effet, plusieurs autocorrélations présentent des valeurs significativement non nulles, ce qui signifie que la série chronologique n'est pas aléatoire. 
+Nous pouvons faire quelques observations sur le graphique de l'ACF. Ce graphique nous permet de détecter une structure de corrélation du réseau. Dans notre cas, plusieurs autocorrélations présentent des valeurs significativement non nulles, ce qui signifie que la série chronologique n'est pas aléatoire. 
 
 
-### Stationnarité
+### Décomposition de la série
 
-Ensuite, nous cherchons à nous ramener à une série stationnaire. Pour cela, nous devons éliminer la tendance linéaire. Afin de stationariser notre série, nous allons utiliser l'opérateur diff. \
+```{r}
+# mod_stl_add <- stl(ts_serie1, s.window = "periodic")
+```
+```{r}
+# serie1 |>  ggplot() +
+#   geom_line(aes(x = date, y=new_cases, color="Xt")) +
+#   geom_line(aes(x=date, y=trend+seasonal, color="mt+st")) + 
+#   geom_line(aes(x=date, y=trend, color="mt")) +
+#   scale_color_manual(values = c("red", "blue", "black")) +
+#   theme(legend.position = c(0.8, 0.08), legend.direction = "horizontal") +
+#   labs(colour = "Modele") + 
+#   ggtitle("Modèle additif") +
+#   xlab("Années") + 
+#   ylab("Nombre de cas de varicelles") + theme_minimal()
+```
+
+
+
+
+### Stationnarité 
+
+**Retrait de la saisonnalité** 
+
+Ensuite, nous cherchons à nous ramener à une série stationnaire. Pour cela, nous devons éliminer la tendance linéaire. Afin de stationariser notre série, nous allons utiliser l'opérateur diff. Nous allons donc construire un filtre permettant de construire notre analyse. \
 
 Tout d'abord, nous avons décider de ne pas transformer notre série en logarithme. Celle-ci nous permettrait de réduire sa variance mais puisque la série présente des valeurs nulles, cette transformation n'est pas pertinente. \
 
@@ -138,13 +162,22 @@ serie_lissee <- ts_serie1 |>
 
 ndiffs(serie_lissee) # la série a été différencié comme il faut
 ```
+Puisque l'on différencie une seule fois, la variance augmente mais reste plus faible que si l'on avait différencié 3 ou 4 fois par exemple.
 
 ```{r}
 serie_lissee |> 
-  forecast::ggtsdisplay(plot.type= "scatter")
+  ggtsdisplay(plot.type = "scatter",smooth=FALSE)
 ```
-Grâce à notre différenciation, nous avons pu stationariser notre série et supprimer la tendance. 
 
+Grâce à cette méthode, nous pouvons faire plusieurs constats :
+- **Le chronogramme** : 
+Notre différenciation nous permet de stationariser notre série et supprimer la tendance. Nous pouvons donc émettre l'hypothèse d'un modèle polynomial. 
+
+- **L'ACF** :
+L'auto-corrélation décroit car on fait des moyennes sur de moins en moins de valeurs. Nous n'observons pas de saisonnalité dans notre série.
+
+- **Corrélation** :
+Nous ne pouvons pas observer de réelle périodicité. 
 
 ### Détection de l'autocorrélation partielle
 
@@ -156,9 +189,14 @@ Nous avons choisi d'utiliser cette fonction car le corrélogramme produit par la
 pacf(serie_lissee)
 ```
 
-# A INTERPRETER
+
+
+
+
 
 ### Estimation du modèle
+
+Nous allons essayer de choisir le meilleur modèle afin d'estimer notre série.
 
 # ARIMA ?
 # ARMA ?
@@ -168,8 +206,16 @@ pacf(serie_lissee)
 ```
 
 
-## Prévisions
+### Estimation par régression linéaire (MCO)
 
+```{r}
+t <- 1:length(ts_serie1)
+x <- outer(t,1:6)*(pi/6)
+df <- data.frame(ts_serie1,t,cos(x),sin(x[,-6])) 
+ts_serie1_lm <- lm(data=df,ts_serie1~.)
+
+summary(ts_serie1_lm)
+```
 
 
 
