@@ -4,26 +4,257 @@ output: html_document
 date: "`r Sys.Date()`"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r}
+library(tidyverse)
+library(forecast)
+library(tidyquant)
+library(tseries)
+library(caschrono)
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+# Importations des données 
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+Tout d'abord, on importe les données et on sélectionne les données concernant la France. 
 
-```{r cars}
-summary(cars)
+```{r eval=FALSE, include=FALSE}
+donnees <- read.csv("owid-covid-data.csv",sep=",",stringsAsFactors = T)
+donnees_modif <- donnees |> 
+  filter(iso_code == "FRA") |> 
+  select(date,new_cases)
+summary(donnees_modif)
+
+write.table(x = donnees_modif, file = "covid_france.csv", sep = ",")
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+```{r}
+donnees_fr <- read.csv("covid_france.csv",sep=",")
+summary(donnees_fr)
+```
+Les données ci-dessus comprennent une variable temporelle et une variable caractérisée par un enregistrement journalier des nouveaux cas de Covid-19 en France. 
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+min(donnees_fr$date)
+max(donnees_fr$date)
+```
+Grâce à cette étape, nous pouvons observer que notre série temporelle débute le 1er Mars 2020 et se termine le 19 Avril 2023. Notre étude a donc une plage d'environ de 3 ans.
+
+## Transformation des données en série temporelle
+
+Premièrement, nous allons transformer nos données en séries temporelles pour pouvoir réaliser notre analyse. 
+
+```{r}
+ts_donnees_fr <- ts(donnees_fr$new_cases,start = c(2020,1,3), frequency = 365)
+# class(ts_donnees_fr)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# Première partie 
+
+```{r}
+plot(ts_donnees_fr)
+```
+Ce premier graphique nous montre une hausse brutale des nouveaux cas de covids en 2022. Afin de pouvoir continuer notre analyse de façon cohérente, nous allons diviser notre série en 3 parties : avant, pendant et après ce choc en 2022.  
+
+## Division de notre série 
+
+Nous décidons de créer trois sous-séries de notre série initiale afin de pouvoir réaliser le traitement des données. Notre objectif est d'isoler le cas particulier de l'année 2022 pour avoir une étude correcte.
+
+```{r}
+serie1 <- donnees_fr |> 
+  filter(date<="2021-12-22")
+# serie1
+ts_serie1 <- ts(serie1$new_cases,start = c(2020,1,3), frequency = 365)
+
+
+
+serie2 <- donnees_fr |> 
+  filter(date>"2021-12-22", date<="2023-01-05")
+# serie2
+
+ts_serie2 <- ts(serie2$new_cases,start = c(2021,31,12), frequency = 365)
+
+
+
+serie3 <- donnees_fr |> 
+  filter(date>"2023-01-05")
+
+ts_serie3 <- ts(serie3$new_cases,start = c(2023,2,5), frequency = 365)
+```
+
+Nous avons choisi de scinder notre série en trois périodes : 
+- avant le 22 Décembre 2021
+- entre le 23 Décembre 2021 et le 5 Janvier 2023
+- après le 6 Janvier 2023
+
+Nous pouvons maintenant les visualiser : 
+
+```{r}
+plot(ts_serie1,main="Nouveaux cas de covid-19 en France entre 2020 et 2022")
+```
+
+```{r}
+plot(ts_serie2,main="Nouveaux cas de covid-19 en France entre 2022 et 2023")
+```
+
+```{r}
+plot(ts_serie3,main="Nouveaux cas de covid-19 en France en 2023")
+```
+
+Grâce à cette division, nous allons pouvoir étudier chaque sous-série pertinemment. 
+
+## Analyse de la première sous-série
+
+Nous avons décidé de nous focaliser sur la première sous-série. \
+Notre étude commence donc le 1er Mars 2020 et s'étend jusqu'au 22 décembre 2021.
+
+Pour rappel, notre série présente une tendance à la hausse comme le montre le graphique ci-dessous. Elle présente aussi une saisonnalité, mais elle n'est pas régulière. En effet, les différentes hausses de nouveaux cas de covid dépendent des confinements et des mesures sanitaires mises en place.
+
+```{r}
+autoplot(ts_serie1)+
+  geom_smooth(method = lm,color="blue")+
+  ggtitle("Nouveaux cas de covids en France entre 2020 et 2022")
+```
+
+
+On va d'abord chercher à décrire notre série grâce à des indicateurs descriptifs simples.
+
+```{r}
+mean(ts_serie1)
+```
+Entre le 1er Mars 2020 et le 22 Décembre 2022, la moyenne des nouveaux cas de covids par jour était de 11 763 cas en France.
+
+```{r}
+ts_serie1 |> 
+  ggtsdisplay(plot.type = "scatter",smooth=FALSE)
+```
+Nous pouvons faire quelques observations sur le graphique de l'ACF. En effet, plusieurs autocorrélations présentent des valeurs significativement non nulles, ce qui signifie que la série chronologique n'est pas aléatoire. 
+
+
+### Transformation en données hebdomadaires 
+
+```{r}
+week <-  data.frame(Date = donnees_fr$date, New_cases = donnees_fr$new_cases)
+week <- week |> tq_transmute(select = New_cases,
+                             mutate_fun= apply.weekly,
+                             FUN = sum) 
+
+week <- week |> flexable()
+```
+
+
+
+### Stationnarité
+
+Ensuite, nous cherchons à nous ramener à une série stationnaire. Pour cela, nous devons éliminer la tendance linéaire. Afin de stationariser notre série, nous allons utiliser l'opérateur diff. \
+
+Tout d'abord, nous avons décider de ne pas transformer notre série en logarithme. Celle-ci nous permettrait de réduire sa variance mais puisque la série présente des valeurs nulles, cette transformation n'est pas pertinente. \
+
+Nous allons donc différencier la série : 
+
+```{r}
+ndiffs(ts_serie1) # On nous conseille de différencier la série 1 fois
+
+serie_lissee <- ts_serie1 |> 
+  diff(lag=1)
+
+ndiffs(serie_lissee) # la série a été différencié comme il faut
+```
+
+```{r}
+serie_lissee |> 
+  forecast::ggtsdisplay(plot.type= "scatter")
+```
+Grâce à notre différenciation, nous avons pu stationariser notre série et supprimer la tendance. 
+
+```{r}
+kpss.test(serie_lissee)
+ts.plot(serie_lissee, main = "Serie différenciée", col ="blue")
+```
+
+
+
+
+### Détection de l'autocorrélation partielle et identification des degrés p et q 
+
+Afin de détecter la présence d'autocorrélation partielle, nous allons utiliser la fonction pacf. Elle nous permet de mesurer l'aurocorrélation d'un signal pour un décalage k "indépendamment" des autocorrélations pour les décalages inférieurs. \
+Nous avons choisi d'utiliser cette fonction car le corrélogramme produit par la fonction ggdisplay montre des autocorrélations fortes à répétition.
+
+
+```{r}
+pacf(serie_lissee)
+```
+
+
+```{r}
+acf2y(serie_lissee,lag.max = 15)
+```
+
+On choisit p=2 et q= 2 
+
+## Sous serie par semaine 
+
+
+```{r}
+serie1 <- donnees_fr |> 
+  filter(date<="2021-12-22")
+# serie1
+ts_serie1 <- ts(serie1$new_cases,start = c(2020,1,3), frequency = 365)
+
+
+```
+
+# A INTERPRETER
+
+### Estimation du modèle
+
+Afin de pouvoir estimer le modèle, nous avons utiliser la fonction auto.arima() du pakage forecast qui permet d'effectuer une modélisation automatique. En précisant les arguments trace=T et ic=aic, nous avons donner la main au logiciel R de selectionner le meilleur modèle sur la base du critère AIC 
+
+## ARIMA ?
+
+```{r}
+model_arima <- auto.arima(serie_lissee, trace=T, ic = "aic")
+```
+
+Modèle identifier : ARIMA(4,0,4)
+
+```{r}
+summary(model_arima)
+```
+
+```{r}
+t_stat(model_arima)
+```
+
+Le modèle n'est pas simplifiable
+
+## Validation du modèle (validation interne)
+
+```{r}
+Box.test(model_arima$residuals, lag = 10, type= "Ljung-Box")
+```
+Pas très efficae ?? Vous en pensez quoi ? p_value pas acceptable 
+
+
+```{r}
+checkresiduals(model_arima)
+```
+
+
+# ARMA ?
+
+```{r}
+# auto.arima(serie_lissee,d=1,D=1,stepwise = FALSE,approximation=FALSE,trace=TRUE)
+```
+
+
+## Prévisions
+
+
+
+
+
+
+
+
+

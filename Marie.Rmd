@@ -1,5 +1,5 @@
 ```{r message = FALSE}
-library(dplyr)
+library(tidyverse)
 library(forecast)
 ```
 
@@ -45,9 +45,9 @@ ts_donnees_fr <- ts(donnees_fr$new_cases,start = c(2020,1,3), frequency = 365)
 ```{r}
 plot(ts_donnees_fr)
 ```
-Ce premier graphique nous montre une hausse brutale des cas de covids en 2022. Afin de pouvoir continuer notre analyse de façon cohérente, nous allons diviser notre série en 2 parties : avant et après 2022.  
+Ce premier graphique nous montre une hausse brutale des nouveaux cas de covids en 2022. Afin de pouvoir continuer notre analyse de façon cohérente, nous allons diviser notre série en 3 parties : avant, pendant et après ce choc en 2022.  
 
-
+## Division de notre série 
 
 Nous décidons de créer trois sous-séries de notre série initiale afin de pouvoir réaliser le traitement des données. Notre objectif est d'isoler le cas particulier de l'année 2022 pour avoir une étude correcte.
 
@@ -73,79 +73,108 @@ serie3 <- donnees_fr |>
 ts_serie3 <- ts(serie3$new_cases,start = c(2023,2,5), frequency = 365)
 ```
 
+Nous avons choisi de scinder notre série en trois périodes : 
+- avant le 22 Décembre 2021
+- entre le 23 Décembre 2021 et le 5 Janvier 2023
+- après le 6 Janvier 2023
+
+Nous pouvons maintenant les visualiser : 
 
 ```{r}
-plot(ts_serie1)
+plot(ts_serie1,main="Nouveaux cas de covid-19 en France entre 2020 et 2022")
 ```
 
 ```{r}
-plot(ts_serie2)
+plot(ts_serie2,main="Nouveaux cas de covid-19 en France entre 2022 et 2023")
 ```
 
 ```{r}
-plot(ts_serie3)
+plot(ts_serie3,main="Nouveaux cas de covid-19 en France en 2023")
 ```
 
-Grâce à cette division, nous allons pouvoir étudier chaque sous-série pertinemment.
+Grâce à cette division, nous allons pouvoir étudier chaque sous-série pertinemment. 
 
+## Analyse de la première sous-série
 
+Nous avons décidé de nous focaliser sur la première sous-série. \
+Notre étude commence donc le 1er Mars 2020 et s'étend jusqu'au 22 décembre 2021.
+
+Pour rappel, notre série présente une tendance à la hausse comme le montre le graphique ci-dessous. Elle présente aussi une saisonnalité, mais elle n'est pas régulière. En effet, les différentes hausses de nouveaux cas de covid dépendent des confinements et des mesures sanitaires mises en place.
 
 ```{r}
-
+autoplot(ts_serie1)+
+  geom_smooth(method = lm,color="blue")+
+  ggtitle("Nouveaux cas de covids en France entre 2020 et 2022")
 ```
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+On va d'abord chercher à décrire notre série grâce à des indicateurs descriptifs simples.
 
 ```{r}
-ts_donnees_fr |> 
-  ggtsdisplay(
-    plot.type = "scatter")
+mean(ts_serie1)
 ```
-
-- ACF : pas de corrélation par mois (plus sur une période, sur plusieurs mois)
-- Nuage de points à moitié aligné --> corrélation 
-
+Entre le 1er Mars 2020 et le 22 Décembre 2022, la moyenne des nouveaux cas de covids par jour était de 11 763 cas en France.
 
 ```{r}
-forecast::gglagplot(ts_donnees_fr,lags=12,do.lines = FALSE)
+ts_serie1 |> 
+  ggtsdisplay(plot.type = "scatter",smooth=FALSE)
 ```
+Nous pouvons faire quelques observations sur le graphique de l'ACF. En effet, plusieurs autocorrélations présentent des valeurs significativement non nulles, ce qui signifie que la série chronologique n'est pas aléatoire. 
 
-On essaie de transformer notre variable : 
+
+### Stationnarité
+
+Ensuite, nous cherchons à nous ramener à une série stationnaire. Pour cela, nous devons éliminer la tendance linéaire. Afin de stationariser notre série, nous allons utiliser l'opérateur diff. \
+
+Tout d'abord, nous avons décider de ne pas transformer notre série en logarithme. Celle-ci nous permettrait de réduire sa variance mais puisque la série présente des valeurs nulles, cette transformation n'est pas pertinente. \
+
+Nous allons donc différencier la série : 
 
 ```{r}
-log_donnees <- log(ts_donnees_fr)
+ndiffs(ts_serie1) # On nous conseille de différencier la série 1 fois
+
+serie_lissee <- ts_serie1 |> 
+  diff(lag=1)
+
+ndiffs(serie_lissee) # la série a été différencié comme il faut
 ```
 
 ```{r}
-plot(log_donnees)
-ggtsdisplay(log_donnees)
+serie_lissee |> 
+  forecast::ggtsdisplay(plot.type= "scatter")
 ```
+Grâce à notre différenciation, nous avons pu stationariser notre série et supprimer la tendance. 
+
+
+### Détection de l'autocorrélation partielle
+
+Afin de détecter la présence d'autocorrélation partielle, nous allons utiliser la fonction pacf. Elle nous permet de mesurer l'aurocorrélation d'un signal pour un décalage k "indépendamment" des autocorrélations pour les décalages inférieurs. \
+Nous avons choisi d'utiliser cette fonction car le corrélogramme produit par la fonction ggdisplay montre des autocorrélations fortes à répétition.
+
 
 ```{r}
-carre_donnees <- ts_donnees_fr^2
-plot(carre_donnees)
-ggtsdisplay(carre_donnees)
+pacf(serie_lissee)
+```
+
+# A INTERPRETER
+
+### Estimation du modèle
+
+# ARIMA ?
+# ARMA ?
+
+```{r}
+# auto.arima(serie_lissee,d=1,D=1,stepwise = FALSE,approximation=FALSE,trace=TRUE)
 ```
 
 
-- Essayer de trouver un modèle qui lisse les données 
+## Prévisions
+
+
+
+
+
+
+
+
+
