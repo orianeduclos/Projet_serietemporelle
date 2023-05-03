@@ -1,0 +1,204 @@
+---
+title: 'Margaux'
+author: "Margaux Bailleul"
+date: "2023-04-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# COVID 19 à l'Allemagne
+
+Manipulation de la base de données 
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(forecast)
+
+donnees <- read.csv("owid-covid-data.csv",sep=",",stringsAsFactors = T)
+donnees_modif <- donnees |> 
+  filter(iso_code == "FRA") |> 
+  select(date,new_cases)
+summary(donnees_modif)
+
+write.table(x = donnees_modif, file = "covid_france.csv", sep = ",")
+```
+
+```{r}
+donnees_fr <- read.csv("covid_france.csv",sep=",")
+summary(donnees_fr)
+```
+
+
+```{r}
+ts_donnees_fr <- ts(donnees_fr$new_cases,start = c(2020,1,3), frequency = 365)
+```
+
+
+# Première partie 
+
+```{r}
+plot(ts_donnees_fr)
+```
+Ce premier graphique nous montre une hausse brutale des nouveaux cas de covids en 2022. Afin de pouvoir continuer notre analyse de façon cohérente, nous allons diviser notre série en 3 parties : avant, pendant et après ce choc en 2022.  
+
+Application de la décomposition saisonnière à la série temporelle pour visualiser les tendances et les motifs saisonniers
+
+```{r}
+decomp_ts <- stl(na.omit(ts_donnees_fr), s.window = "periodic")
+plot(decomp_ts)
+```
+
+## Division de notre série 
+
+Nous décidons de créer trois sous-séries de notre série initiale afin de pouvoir réaliser le traitement des données. Notre objectif est d'isoler le cas particulier de l'année 2022 pour avoir une étude correcte.
+
+```{r}
+serie1 <- donnees_fr |> 
+  filter(date<="2021-12-22")
+# serie1
+ts_serie1 <- ts(serie1$new_cases,start = c(2020,1,3), frequency = 365)
+
+
+
+serie2 <- donnees_fr |> 
+  filter(date>"2021-12-22", date<="2023-01-05")
+# serie2
+
+ts_serie2 <- ts(serie2$new_cases,start = c(2021,31,12), frequency = 365)
+
+
+
+serie3 <- donnees_fr |> 
+  filter(date>"2023-01-05")
+
+ts_serie3 <- ts(serie3$new_cases,start = c(2023,2,5), frequency = 365)
+```
+
+Nous avons choisi de scinder notre série en trois périodes : 
+- avant le 22 Décembre 2021
+- entre le 23 Décembre 2021 et le 5 Janvier 2023
+- après le 6 Janvier 2023
+
+Nous pouvons maintenant les visualiser : 
+
+```{r}
+plot(ts_serie1,main="Nouveaux cas de covid-19 en France entre 2020 et 2022")
+```
+
+```{r}
+plot(ts_serie2,main="Nouveaux cas de covid-19 en France entre 2022 et 2023")
+```
+
+```{r}
+plot(ts_serie3,main="Nouveaux cas de covid-19 en France en 2023")
+```
+
+Grâce à cette division, nous allons pouvoir étudier chaque sous-série pertinemment. 
+
+## Analyse de la première sous-série
+
+Nous avons décidé de nous focaliser sur la première sous-série. \
+Ce choix est expliqué grâce à notre connaissance des évènements durant cette année particulière. En effet, les confinements ont pu avoir des conséquences sur notre série et nos données.
+Notre étude commence donc le 1er Mars 2020 et s'étend jusqu'au 22 décembre 2021.
+
+Pour rappel, notre série présente une tendance à la hausse comme le montre le graphique ci-dessous. Elle présente aussi une saisonnalité, mais elle n'est pas régulière. En effet, les différentes hausses de nouveaux cas de covid dépendent des confinements et des mesures sanitaires mises en place.
+
+
+```{r}
+forecast::ggtsdisplay(ts_serie1)
+```
+
+
+```{r}
+result_acf <- acf(ts_serie1)
+print(data.frame(result_acf$lag,result_acf$acf)[1:10,])
+```
+
+En examinant les graphes ACF et PACF, nous avons observé une corrélation significative avec les observations de l'année précédente et des années antérieures pour les deux graphes. Cela indique une forte dépendance des observations passées dans la série temporelle. Cependant, les pics les plus importants dans l'ACF étaient à 7 jours et 14 jours, ce qui suggère une corrélation hebdomadaire. Nous avons donc choisi de nous concentrer sur la période de 2022 pour notre analyse, en utilisant une fréquence de 7 jours pour mettre en évidence la corrélation hebdomadaire des cas quotidiens de Covid-19 en Allemagne.
+
+
+```{r}
+covid19_fr_serie_2022_2023_weekly <- ts(ts_serie1, frequency = 7)
+```
+
+Suppression de la tendance 
+
+```{r}
+diff1<- diff(covid19_fr_serie_2022_2023_weekly)
+diff2<-diff(diff1)
+diff3<-diff(diff2)
+diff4<-diff(diff3)
+
+#
+plot(diff1, col = "orangered2")
+plot(diff2, col = "orangered2")
+plot(diff3, col = "orangered2")
+plot(diff4, col = "orangered2")
+
+# on peut fixer un degre de d=3
+# Supression de la tendance m 
+```
+
+
+```{r}
+lissage <- c(rep(1, 3), 2, rep(1, 3)) / 7
+serie_lissee <- covid19_fr_serie_2022_2023_weekly %>% 
+  stats::filter(
+    filter = lissage, 
+    sides = 2)
+ggtsdisplay(serie_lissee, plot.type = "scatter")
+```
+
+Retrait de la saisonnalité
+
+```{r}
+serie_lissee2 <- covid19_fr_serie_2022_2023_weekly %>% 
+  diff(lag=7)
+```
+
+Proposition de degré
+```{r}
+serie_lissee2  %>% 
+  diff(differences = 3) %>% 
+  ggtsdisplay(plot.type = "scatter")
+
+```
+
+
+
+
+
+```{r}
+#Modéliser la série temporelle en utilisant ARIMA (AutoRegressive Integrated Moving Average)
+arima_model <- forecast::auto.arima(ts_serie1)
+summary(arima_model)
+```
+
+## Prévisions futures
+
+Maintenant que nous avons ajusté notre modèle à notre série temporelle, nous pouvons utiliser la fonction forecast() pour faire des prévisions futures. Nous ferons des prévisions pour les 30 prochains jours.
+Prévisions pour les 30 prochains jours
+
+```{r}
+forecast_cases <- forecast::forecast(arima_model, h = 30)
+
+#Visualiser les prévisions futures
+plot(forecast_cases)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
