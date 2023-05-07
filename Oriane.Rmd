@@ -10,6 +10,8 @@ library(forecast)
 library(tidyquant)
 library(tseries)
 library(caschrono)
+
+
 ```
 
 
@@ -26,6 +28,99 @@ summary(donnees_modif)
 
 write.table(x = donnees_modif, file = "covid_france.csv", sep = ",")
 ```
+
+------------------------------
+
+```{r}
+donnees_fr <- read.csv("covid_france.csv",sep=",")
+```
+
+
+
+```{r}
+# Transformation des données en série temporelle
+ts_donnees_fr <- ts(donnees_fr$new_cases, start = c(2020, 1), frequency = 365)
+
+# Division de la série en trois parties
+ts_serie1 <- window(ts_donnees_fr, start = c(2021, 12))
+ts_serie2 <- window(ts_donnees_fr, start = c(2021, 12), end = c(2023, 1))
+ts_serie3 <- window(ts_donnees_fr, start = c(2023, 1), end = c(2023, 1))
+
+# Visualisation des séries
+par(mfrow = c(3, 1))
+plot(ts_serie1, main = "Nouveaux cas de COVID-19 en France entre 2020 et 2021")
+plot(ts_serie2, main = "Nouveaux cas de COVID-19 en France entre 2021 et 2023")
+plot(ts_serie3, main = "Nouveaux cas de COVID-19 en France en 2023")
+
+# Analyse de la première sous-série
+summary(ts_serie1)
+autoplot(ts_serie1) +
+  geom_smooth(method = "loess", color = "blue") +
+  ggtitle("Nouveaux cas de COVID-19 en France entre 2020 et 2021")
+
+# Décomposition de la série en tendance, saisonnalité et résidus
+decomp_serie1 <- stl(ts_serie1, s.window = "periodic")
+autoplot(decomp_serie1)
+
+# Tests de stationnarité
+adf.test(ts_serie1)
+kpss.test(ts_serie1)
+
+# Transformation de la série pour obtenir une stationnarité
+ts_serie1_diff <- diff(ts_serie1, differences = 1)
+autoplot(ts_serie1_diff) +
+  ggtitle("Différence première pour obtenir une stationnarité")
+
+# Tests de stationnarité sur la série différenciée
+adf.test(ts_serie1_diff)
+kpss.test(ts_serie1_diff)
+
+# Identification des paramètres pour un modèle ARIMA
+auto.arima(ts_serie1)
+
+# Modèle ARIMA
+modele_arima <- arima(ts_serie1, order = c(0, 1, 1))
+summary(modele_arima)
+
+# Diagnostic du modèle
+checkresiduals(modele_arima)
+
+# Prévision pour l'année 2022
+forecast_arima <- forecast(modele_arima, h = 365)
+autoplot(forecast_arima) +
+  ggtitle("Prévision des nouveaux cas de COVID-19 en France pour l'année 2022")
+
+# Métriques d'évaluation de la prévision
+accuracy(forecast_arima)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ```{r}
