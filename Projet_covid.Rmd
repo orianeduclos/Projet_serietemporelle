@@ -62,8 +62,7 @@ Ce premier graphique nous montre une hausse brutale des nouveaux cas de covids e
 
 
 
-Application de la décomposition saisonnière à la série temporelle pour visualiser les tendances et les motifs saisonniers.
-Nous supprimons les données manquantes afin de ne garder que celles qui sont pertinentes.
+Nous allons appliquer la décomposition saisonnière à la série temporelle pour visualiser les tendances et les motifs saisonniers.Nous supprimons les données manquantes afin de ne garder que celles qui sont pertinentes.
 
 ```{r}
 decomp_ts <- stl(na.omit(ts_donnees_fr), s.window = "periodic")
@@ -72,20 +71,6 @@ autoplot(decomp_ts)
 
 Cette étape nous permet d'observer une tendance à la hausse entre 2020 et 2022, puis à partir de 2022, une tendance à la baisse. \
 De plus, nous pouvons voir une saisonnalité annuelle.
-
-
-
-
-Decomposition par moyenne mobile 
-
-La fonction decompose permet d’extraire d’une série temporelle (via la méthode de la moyenne mobile)
-
-```{r}
-serie_decomp<-decompose(na.omit(ts_donnees_fr),type=c('additive'))
-decomp_ts <- stl(na.omit(ts_donnees_fr), s.window = "periodic")
-autoplot(serie_decomp)
-```
-
 
 
 ## Division de notre série 
@@ -115,9 +100,13 @@ ts_serie3 <- ts(serie3$new_cases,start = c(2023,2,5), frequency = 365)
 ```
 
 Nous avons choisi de scinder notre série en trois périodes : 
+
 - avant le 22 Décembre 2021
+
 - entre le 23 Décembre 2021 et le 5 Janvier 2023
+
 - après le 6 Janvier 2023
+
 
 Nous pouvons maintenant les visualiser : 
 
@@ -133,7 +122,7 @@ plot(ts_serie2,main="Nouveaux cas de covid-19 en France entre 2022 et 2023")
 plot(ts_serie3,main="Nouveaux cas de covid-19 en France en 2023")
 ```
 
-Grâce à cette division, nous allons pouvoir étudier chaque sous-série pertinemment. 
+Grâce à cette division, nous allons pouvoir sélectionner la sous-série la plus pertinente.
 
 ## Analyse de la première sous-série
 
@@ -170,7 +159,6 @@ Afin d'avoir une analyse plus exhaustive, nous pouvons analyser l'ACF et la PACF
 ```{r}
 acf <- acf(ts_serie1)
 print(data.frame(acf$lag,acf$acf))
-# plot(data.frame(acf$lag,acf$acf))
 ```
 
 Ce graphique nous permet d'observer une corrélation hebdomadaire. En effet, nous pouvons remarquer un pic plus élevé tous les 7 jours.
@@ -186,6 +174,8 @@ autoplot(ts_serie_semaine) # Visualisation des données
 decomp_ts <- stl(na.omit(ts_serie_semaine), s.window = "periodic")
 autoplot(decomp_ts)
 ```
+
+**INTERPRÉTATION DES NOUVEAUX GRAPHIQUES ??**
 
 ### Retrait de la tendance / saisonnalité
 
@@ -211,6 +201,7 @@ serie_lissee |>
 ```
 
 Grâce à cette méthode, nous pouvons faire plusieurs constats :
+
 - **Le chronogramme** : 
 Notre différenciation nous permet de stationariser notre série et supprimer la tendance. Nous pouvons donc émettre l'hypothèse d'un modèle polynomial. 
 
@@ -273,7 +264,7 @@ Afin de pouvoir estimer le modèle, nous avons utiliser la fonction auto.arima()
 #### ARIMA 
 
 ```{r}
-model_arima <- auto.arima(serie_lissee, trace=T, ic = "aic")
+model_arima <- auto.arima(serie_lissee, ic = "aic")
 ```
 
 Modèle identifier : ARIMA(4,0,4)
@@ -289,18 +280,7 @@ t_stat(model_arima)
 Le modèle n'est pas simplifiable
 
 
-
-
-
-
-```{r}
-# auto.arima(serie_lissee,d=1,D=1,stepwise = FALSE,approximation=FALSE,trace=TRUE)
-```
-
-
-### Estimation par régression linéaire (MCO)
-
-
+### Estimation par régression linéaire (MCO) POURQUOI ON FAIT ÇA ? 
 
 
 ```{r}
@@ -318,20 +298,29 @@ summary(ts_serie1_lm)
 --> test de blancheur : box.test 
 
 La fonction Box.test(serie,lag=H) examine l’hypothèse nulle de nullité des H première auto-covariance, à l’aide du test du portemanteau.
-Par défaut H est fixé à 1, et seule la nullité de l’auto-covariance d’ordre 1 est testée. Pour tester si la série peut-être apparentée à un bruit blanc, nous fixerons arbitrairement un H de l’ordre de 20 (nous considérerons abusivement que si les 20 premières auto-corrélations sont nulles, la série est indépendante). La première valeur affichée est la statistique du test. La p-value est la probabilitéd’obtenir une valeur aussi élevée sous l’hypothèse nulle. Si nous voulons faire un test au niveau de confiance 0, 95 : dans le cas où cette valeur est < 0, 05, nous rejetons l’hypothèse nulle.
+Par défaut H est fixé à 1, et seule la nullité de l’auto-covariance d’ordre 1 est testée. Pour tester si la série peut-être apparentée à un bruit blanc, nous fixerons arbitrairement un H de l’ordre de 20 (nous considérerons abusivement que si les 20 premières auto-corrélations sont nulles, la série est indépendante). La première valeur affichée est la statistique du test. La p-value est la probabilité d’obtenir une valeur aussi élevée sous l’hypothèse nulle. Si nous voulons faire un test au niveau de confiance 0.95 : dans le cas où cette valeur est < 0.05, nous rejetons l’hypothèse nulle.
 
 ```{r}
 Box.test(ts_serie1,lag=12)
 ```
-Ici, on ????? l'hypothèse
+L'hypothèse de non-autocorrélation de la série temporelle peut être rejetée avec une confiance de 95%. Cela implique que la série temporelle présente une autocorrélation significative et que les valeurs successives de la série temporelle sont dépendantes les unes des autres.
 
-
-
-
---> test de durbin watson : test auto corrélation des erreurs du modele arima
+La fonction ks.test() est une fonction de test de Kolmogorov-Smirnov dans R, qui permet de comparer une distribution empirique à une distribution théorique.
 
 ```{r}
-dwtest(model_arima ~ lag(model_arima, 1))
+ks.test(ts_serie1, "pnorm", mean(ts_serie1), sd(ts_serie1))
+```
+Les données ne suivent pas une distribution théorique. 
+
+# Prévisions 
+
+Maintenant que nous avons ajusté notre modèle à notre série temporelle, nous pouvons utiliser la fonction forecast() pour faire des prévisions futures. Nous ferons des prévisions pour les 7 prochains jours.
+J'AI RECOPIÉ LE TRUC DE HADIROU FAUT CHANGER
+
+```{r}
+forecast_cases <- forecast::forecast(model_arima, h = 7)
+plot(forecast_cases)
 ```
 
---> 
+
+
