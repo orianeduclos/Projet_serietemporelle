@@ -279,19 +279,40 @@ t_stat(model_arima)
 
 Le modèle n'est pas simplifiable
 
+#### Modèle polynomial 
 
-### Estimation par régression linéaire (MCO) POURQUOI ON FAIT ÇA ? 
+Il peut être utile de modéliser le nombre de nouveaux cas de COVID-19 en utilisant une méthode de régression polynomiale. Les données montrent une tendance générale à la hausse au fil du temps, une régression polynomiale peut être utilisée pour décrire cette tendance. 
 
+```{r}
+plot(diff(ts_serie_semaine, differences = 1),type="l")
+plot(diff(ts_serie_semaine, differences = 2),type="l")
+plot(diff(ts_serie_semaine, differences = 3),type="l")
+plot(diff(ts_serie_semaine, differences = 4),type="l")
+plot(diff(ts_serie_semaine, differences = 5),type="l")
+```
+Le degré d de la tendance polynomiale est 3. On a un graphique avec d = 2 qui est à peu près centré donc on choisit d = 2.\
+La période est T = 7 car nous avons des données hebdomadaires. \
+
+Nous devons donc avoir 3 régresseurs pour la tendance et 6 régresseurs pour la saisonnalité.
 Il faut génerer les variables explicatives pour ajuster les variables du modèle au sens du MCO. 
-
 
 ```{r}
 t <- 1:length(ts_serie1)
 x <- outer(t,1:6)*(pi/6)
 df <- data.frame(ts_serie1,t,cos(x),sin(x[,-6])) 
-ts_serie1_lm <- lm(data=df,ts_serie1~.)
 
-summary(ts_serie1_lm)
+
+x <- matrix(1,nrow=nrow(ts_serie_semaine),ncol=9) # car 9 régresseurs au total
+t <- 1:nrow(ts_serie_semaine)
+x[,2] <- t
+x[,3] <- t**2
+x[,5] <- cos((2*pi*t)/7)
+x[,6] <- cos((4*pi*t**2)/7)
+x[,7] <- sin((2*pi*t)/7)
+x[,8] <- sin((4*pi*t**2)/7)
+
+
+ts_serie1_lm <- lm(data=df,ts_serie1~.)
 ```
 
 
