@@ -282,6 +282,8 @@ Le modèle n'est pas simplifiable
 
 ### Estimation par régression linéaire (MCO) POURQUOI ON FAIT ÇA ? 
 
+Il faut génerer les variables explicatives pour ajuster les variables du modèle au sens du MCO. 
+
 
 ```{r}
 t <- 1:length(ts_serie1)
@@ -312,6 +314,16 @@ ks.test(ts_serie1, "pnorm", mean(ts_serie1), sd(ts_serie1))
 ```
 Les données ne suivent pas une distribution théorique. 
 
+# Comparaison des modèles 
+
+```{r}
+c(AIC(model_arima),AIC(ts_serie1_lm))
+c(BIC(model_arima),BIC(ts_serie1_lm))
+```
+
+Nous aurons tendance à privilégier le modèle ARIMA puisque les critères de l'AIC et le BIC sont minimisés. 
+
+
 # Prévisions 
 
 Maintenant que nous avons ajusté notre modèle à notre série temporelle, nous pouvons utiliser la fonction forecast() pour faire des prévisions futures. Nous ferons des prévisions pour les 7 prochains jours.
@@ -323,4 +335,7 @@ plot(forecast_cases)
 ```
 
 
+```{r}
+predict(model_arima)
+```
 
