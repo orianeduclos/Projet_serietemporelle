@@ -285,8 +285,16 @@ Le modèle n'est pas simplifiable.
 Avant de pouvoir faire un modèle polynomial, il faut vérifier la normalité des résidus. Nous pouvons effectuer ceci grâce à un test de Shapiro.
 
 ```{r}
+
+model <- lm(ts_serie_semaine ~ poly(ts_serie_semaine, 2, raw=TRUE))
+summary(model)
+```
+
+
+```{r}
 shapiro.test(ts_serie_semaine)
 ```
+
 La p-value est inférieure à 5%, ce qui nous amène à rejeter l'hypothèse nulle. Nos résidus suivent donc une loi normale. 
 
 Nous pouvons alors construire notre modèle polynomial. 
