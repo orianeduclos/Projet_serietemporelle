@@ -13,6 +13,7 @@ library(caschrono)
 library(stats)
 library(tseries)
 library(lmtest)
+library(sarima)
 ```
 
 # Importations des données 
@@ -277,9 +278,18 @@ summary(model_arima)
 t_stat(model_arima)
 ```
 
-Le modèle n'est pas simplifiable
+Le modèle n'est pas simplifiable. 
 
 #### Modèle polynomial 
+
+Avant de pouvoir faire un modèle polynomial, il faut vérifier la normalité des résidus. Nous pouvons effectuer ceci grâce à un test de Shapiro.
+
+```{r}
+shapiro.test(ts_serie_semaine)
+```
+La p-value est inférieure à 5%, ce qui nous amène à rejeter l'hypothèse nulle. Nos résidus suivent donc une loi normale. 
+
+Nous pouvons alors construire notre modèle polynomial. 
 
 Il peut être utile de modéliser le nombre de nouveaux cas de COVID-19 en utilisant une méthode de régression polynomiale. Les données montrent une tendance générale à la hausse au fil du temps, une régression polynomiale peut être utilisée pour décrire cette tendance. 
 
@@ -315,6 +325,11 @@ x[,8] <- sin((4*pi*t**2)/7)
 ts_serie1_lm <- lm(data=df,ts_serie1~.)
 ```
 
+#### SARIMA
+
+```{r}
+# sarima(ts_serie1_lm)
+```
 
 ### Etude des résidus 
 
@@ -344,6 +359,7 @@ c(BIC(model_arima),BIC(ts_serie1_lm))
 
 Nous aurons tendance à privilégier le modèle ARIMA puisque les critères de l'AIC et le BIC sont minimisés. 
 
+Il aurait été intéressant d'effectuer un test anova pour comparer les modèles. Cependant, nous ne pouvons pas utiliser la méthode anova() sur un objet de classe Arima. 
 
 # Prévisions 
 
