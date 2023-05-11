@@ -13,7 +13,6 @@ library(caschrono)
 library(stats)
 library(tseries)
 library(lmtest)
-library(sarima)
 ```
 
 # Importations des données 
@@ -50,10 +49,10 @@ Premièrement, nous allons transformer nos données en séries temporelles pour 
 
 ```{r}
 ts_donnees_fr <- ts(donnees_fr$new_cases,start = c(2020,1,3), frequency = 365)
-# class(ts_donnees_fr)
+class(ts_donnees_fr)
 ```
 
-# Première partie 
+# Prise en main du jeu de données
 
 ```{r}
 plot(ts_donnees_fr)
@@ -88,15 +87,14 @@ ts_serie1 <- ts(serie1$new_cases,start = c(2020,1,3), frequency = 365)
 
 serie2 <- donnees_fr |> 
   filter(date>"2021-12-22", date<="2023-01-05")
-# serie2
-
+# serie1
 ts_serie2 <- ts(serie2$new_cases,start = c(2021,31,12), frequency = 365)
 
 
 
 serie3 <- donnees_fr |> 
   filter(date>"2023-01-05")
-
+# serie3
 ts_serie3 <- ts(serie3$new_cases,start = c(2023,2,5), frequency = 365)
 ```
 
@@ -114,18 +112,21 @@ Nous pouvons maintenant les visualiser :
 ```{r}
 plot(ts_serie1,main="Nouveaux cas de covid-19 en France entre 2020 et 2022")
 ```
+Dans cette sous-série, nous pouvons observer une saisonnalité avec des pics lors de la fin de l'année, pouvant correspondre à la période hivernale mais aussi au niveau des vacances scolaires (vers le mois de Mars). Ce constat est expliqué par les mouvements de foule et le déplacement des populations. 
 
 ```{r}
 plot(ts_serie2,main="Nouveaux cas de covid-19 en France entre 2022 et 2023")
 ```
+Cette seconde série chronologique nous montre une tendance à la baisse des nouveaux cas de covid 19. Aussi, nous remarquons une saisonnalité environ tous les deux mois. Au début de l'année 2021 le nombre de nouveaux cas est nettement plus important qu'en 2022.
 
 ```{r}
 plot(ts_serie3,main="Nouveaux cas de covid-19 en France en 2023")
 ```
+Enfin, cette sous-série est caractérisée par une tendance à la baisse dans un premier temps puis à la hausse. Ce constat est peut-être expliqué par la reprise de la vie active de la population française.
 
 Grâce à cette division, nous allons pouvoir sélectionner la sous-série la plus pertinente.
 
-## Analyse de la première sous-série
+# Analyse de la première sous-série
 
 Nous avons décidé de nous focaliser sur la première sous-série. \
 Ce choix est expliqué grâce à notre connaissance des évènements durant cette année particulière. En effet, les confinements ont pu avoir des conséquences sur notre série et nos données.
@@ -152,17 +153,18 @@ ts_serie1 |>
   ggtsdisplay(plot.type = "scatter",smooth=FALSE)
 ```
 
-Nous pouvons faire quelques observations sur le graphique de l'ACF. Ce graphique nous permet de détecter une structure de corrélation du réseau. Dans notre cas, plusieurs autocorrélations présentent des valeurs significativement non nulles, ce qui signifie que la série chronologique n'est pas aléatoire. 
+Nous pouvons faire quelques observations sur le graphique de l'ACF. Ce graphique nous permet de détecter une structure de corrélation du réseau. Dans notre cas, plusieurs autocorrélations présentent des valeurs significativement non nulles, ce qui signifie que la série chronologique n'est pas aléatoire. \
+Aussi, nous pouvons observer un nuage de points plutôt aligné, on peut donc se poser la question d'une éventuelle corrélation.
 
 
-Afin d'avoir une analyse plus exhaustive, nous pouvons analyser l'ACF et la PACF
+Afin d'avoir une analyse plus exhaustive, nous pouvons analyser l'ACF et la PACF. En effet, l'étude de l'ACF va nous permettre de détecter la périodicité de la série. 
 
 ```{r}
 acf <- acf(ts_serie1)
 print(data.frame(acf$lag,acf$acf))
 ```
 
-Ce graphique nous permet d'observer une corrélation hebdomadaire. En effet, nous pouvons remarquer un pic plus élevé tous les 7 jours.
+Ce graphique nous permet d'observer une corrélation hebdomadaire. En effet, nous pouvons remarquer un pic plus élevé tous les 7 jours. 
 
 Puisque notre série montre une corrélation hebdomadaire, nous avons choisi d'étudier une série temporelle avec une fréquence de 7 jours.
 
@@ -176,9 +178,7 @@ decomp_ts <- stl(na.omit(ts_serie_semaine), s.window = "periodic")
 autoplot(decomp_ts)
 ```
 
-**INTERPRÉTATION DES NOUVEAUX GRAPHIQUES ??**
-
-### Retrait de la tendance / saisonnalité
+## Retrait de la tendance / saisonnalité
 
 Nous cherchons à nous ramener à une série sans tendance. Afin de la retirer de notre série, nous allons utiliser l'opérateur diff. Nous allons donc construire un filtre permettant de construire notre analyse. \
 
@@ -204,26 +204,16 @@ serie_lissee |>
 Grâce à cette méthode, nous pouvons faire plusieurs constats :
 
 - **Le chronogramme** : 
-Notre différenciation nous permet de stationariser notre série et supprimer la tendance. Nous pouvons donc émettre l'hypothèse d'un modèle polynomial. 
+Notre différenciation nous permet de stationariser notre série et supprimer la tendance. Nous pouvons donc émettre l'hypothèse d'un modèle polynomial. Cela nous permet aussi d'écarter l'hypothèse d'un modèle linéaire.
 
 - **L'ACF** :
 L'auto-corrélation décroit car on fait des moyennes sur de moins en moins de valeurs. 
 De plus, nous pouvons observer une saisonnalité hebdomadaire avec un pic tous les 7 jours (lag).
 
 - **Corrélation** :
-Le nuage de points ne présente pas de direction.
+Le nuage de points ne présente plus de direction, il n'existe donc plus de réelle corrélation.
 
-### Retrait de la saisonnalité 
-
-Pour pouvoir réaliser des tests de stationnarité, nous devons d'abord avoir une série sans tendance ni de saisonnalité.
-
-Ici, notre série n'a plus de tendance, il faut maintenant enlever la saisonnalité.
-
-```{r}
-ts.plot(serie_lissee, main = "Serie différenciée", col ="blue")
-```
-
-### Stationnarité
+## Stationnarité
 
 Ensuite, nous allons tester la stationnarité de notre série :
 
@@ -238,37 +228,22 @@ adf.test(serie_lissee)
 ```
 Lors de ce test, nous obtenons une p-value inférieure à 5%. Nous acceptons l'hypothèse de non-stationnarité. Ce test nous permet de confirmer notre hypothèse précédente.
 
-En conclusion, notre série n'est pas **stationnaire**.
+En conclusion, notre série n'est pas **stationnaire**. Cette conclusion nous permet de confirmer que la mise en place d'un modèle linéaire n'est pas une solution pour modéliser notre série. Notre série n'étant pas stationnaire, nos différents seront moins fiables et nos prévisions moins précises. 
 
-### Détection de l'autocorrélation partielle et identification des degrés p et q 
-
-Afin de détecter la présence d'autocorrélation partielle, nous allons utiliser la fonction pacf. Elle nous permet de mesurer l'aurocorrélation d'un signal pour un décalage k "indépendamment" des autocorrélations pour les décalages inférieurs. \
-Nous avons choisi d'utiliser cette fonction car le corrélogramme produit par la fonction ggdisplay montre des autocorrélations fortes à répétition.
-
-
-```{r}
-pacf(serie_lissee)
-```
-
-
-```{r}
-acf2y(serie_lissee,lag.max = 15)
-```
-
-
-### Estimation du modèle
+# Modélisation de notre série
 
 Nous allons essayer de choisir le meilleur modèle afin d'estimer notre série.
 
-Afin de pouvoir estimer le modèle, nous avons utiliser la fonction auto.arima() du package forecast qui permet d'effectuer une modélisation automatique. En précisant les arguments trace=T et ic=aic, nous avons donner la main au logiciel R de selectionner le meilleur modèle sur la base du critère AIC 
+Afin de pouvoir l'estimer, nous avons utiliser la fonction auto.arima() du package forecast qui permet d'effectuer une modélisation automatique. En précisant les arguments trace=T et ic=aic, nous avons donné la main au logiciel R de selectionner le meilleur modèle sur la base du critère AIC. 
 
-#### ARIMA 
+## Modèle ARIMA 
 
 ```{r}
-model_arima <- auto.arima(serie_lissee, ic = "aic")
+model_arima <- auto.arima(ts_serie_semaine, ic = "aic",trace=TRUE)
+model_arima
 ```
 
-Modèle identifier : ARIMA(4,0,4)
+Modèles identifiés : ARIMA(1,0,1)(0,1,1)
 
 ```{r}
 summary(model_arima)
@@ -277,18 +252,12 @@ summary(model_arima)
 ```{r}
 t_stat(model_arima)
 ```
+Le modèle n'est pas simplifiable.
 
-Le modèle n'est pas simplifiable. 
 
-#### Modèle polynomial 
+### Modèle polynomial 
 
 Avant de pouvoir faire un modèle polynomial, il faut vérifier la normalité des résidus. Nous pouvons effectuer ceci grâce à un test de Shapiro.
-
-```{r}
-
-model <- lm(ts_serie_semaine ~ poly(ts_serie_semaine, 2, raw=TRUE))
-summary(model)
-```
 
 
 ```{r}
@@ -308,55 +277,56 @@ plot(diff(ts_serie_semaine, differences = 3),type="l")
 plot(diff(ts_serie_semaine, differences = 4),type="l")
 plot(diff(ts_serie_semaine, differences = 5),type="l")
 ```
-Le degré d de la tendance polynomiale est 3. On a un graphique avec d = 2 qui est à peu près centré donc on choisit d = 2.\
+Le degré d de la tendance polynomiale est 3. On a un graphique avec d = 3qui est à peu près centré donc on choisit d-1 = 2.\
 La période est T = 7 car nous avons des données hebdomadaires. \
+
+Nous avons donc créé un modèle polynomial de degré 2 pour modéliser la série. 
+```{r}
+model <- lm(ts_serie_semaine ~ poly(ts_serie_semaine, 2, raw=TRUE))
+summary(model)
+```
+
 
 Nous devons donc avoir 3 régresseurs pour la tendance et 6 régresseurs pour la saisonnalité.
 Il faut génerer les variables explicatives pour ajuster les variables du modèle au sens du MCO. 
 
 ```{r}
-t <- 1:length(ts_serie1)
+t <- 1:length(ts_serie_semaine)
 x <- outer(t,1:6)*(pi/6)
-df <- data.frame(ts_serie1,t,cos(x),sin(x[,-6])) 
-
-
-x <- matrix(1,nrow=nrow(ts_serie_semaine),ncol=9) # car 9 régresseurs au total
-t <- 1:nrow(ts_serie_semaine)
-x[,2] <- t
-x[,3] <- t**2
-x[,5] <- cos((2*pi*t)/7)
-x[,6] <- cos((4*pi*t**2)/7)
-x[,7] <- sin((2*pi*t)/7)
-x[,8] <- sin((4*pi*t**2)/7)
-
+df <- data.frame(ts_serie_semaine,t,cos(x),sin(x[,-6]))
+# 
+# 
+# x <- matrix(1,nrow=nrow(ts_serie_semaine),ncol=9) # car 9 régresseurs au total
+# t <- 1:nrow(ts_serie_semaine)
+# x[,2] <- t
+# x[,3] <- t**2
+# x[,5] <- cos((2*pi*t)/7)
+# x[,6] <- cos((4*pi*t**2)/7)
+# x[,7] <- sin((2*pi*t)/7)
+# x[,8] <- sin((4*pi*t**2)/7)
 
 ts_serie1_lm <- lm(data=df,ts_serie1~.)
 ```
 
-#### SARIMA
+
+## Etude des résidus 
+
+La fonction Box.test examine l’hypothèse nulle de nullité des H premières auto-covariance.
+Par défaut H est fixé à 1, et seule la nullité de l’auto-covariance d’ordre 1 est testée.
+
+Pour tester si la série peut-être apparentée à un bruit blanc, nous fixerons un H de l’ordre de 7.
 
 ```{r}
-# sarima(ts_serie1_lm)
+Box.test(ts_serie_semaine,lag=7)
 ```
+Puisque la p-value est inférieure à 5%, on rejette l'hypothèse de non-autocorrélation. Cela implique que la série temporelle présente une autocorrélation significative et que les valeurs successives de la série temporelle sont dépendantes les unes des autres.
 
-### Etude des résidus 
-
---> test de blancheur : box.test 
-
-La fonction Box.test(serie,lag=H) examine l’hypothèse nulle de nullité des H première auto-covariance, à l’aide du test du portemanteau.
-Par défaut H est fixé à 1, et seule la nullité de l’auto-covariance d’ordre 1 est testée. Pour tester si la série peut-être apparentée à un bruit blanc, nous fixerons arbitrairement un H de l’ordre de 20 (nous considérerons abusivement que si les 20 premières auto-corrélations sont nulles, la série est indépendante). La première valeur affichée est la statistique du test. La p-value est la probabilité d’obtenir une valeur aussi élevée sous l’hypothèse nulle. Si nous voulons faire un test au niveau de confiance 0.95 : dans le cas où cette valeur est < 0.05, nous rejetons l’hypothèse nulle.
+La fonction ks.test() est une fonction de test de Kolmogorov-Smirnov dans R, qui permet de comparer une distribution empirique à une distribution théorique normale.
 
 ```{r}
-Box.test(ts_serie1,lag=12)
+ks.test(ts_serie_semaine, "pnorm", mean(ts_serie_semaine), sd(ts_serie_semaine))
 ```
-L'hypothèse de non-autocorrélation de la série temporelle peut être rejetée avec une confiance de 95%. Cela implique que la série temporelle présente une autocorrélation significative et que les valeurs successives de la série temporelle sont dépendantes les unes des autres.
-
-La fonction ks.test() est une fonction de test de Kolmogorov-Smirnov dans R, qui permet de comparer une distribution empirique à une distribution théorique.
-
-```{r}
-ks.test(ts_serie1, "pnorm", mean(ts_serie1), sd(ts_serie1))
-```
-Les données ne suivent pas une distribution théorique. 
+Les données ne suivent pas une distribution théorique car la p-value est inférieure à 5%. On rejette donc l'hypothèse nulle.
 
 # Comparaison des modèles 
 
@@ -371,16 +341,21 @@ Il aurait été intéressant d'effectuer un test anova pour comparer les modèle
 
 # Prévisions 
 
-Maintenant que nous avons ajusté notre modèle à notre série temporelle, nous pouvons utiliser la fonction forecast() pour faire des prévisions futures. Nous ferons des prévisions pour les 7 prochains jours.
-J'AI RECOPIÉ LE TRUC DE HADIROU FAUT CHANGER
+Suite à notre analyse, nous avons utilisé la fonction forecast pour émettre des prévisions sur notre série pour les 7 prochains jours.
 
 ```{r}
 forecast_cases <- forecast::forecast(model_arima, h = 7)
 plot(forecast_cases)
 ```
-
+Les prédictions : 
 
 ```{r}
 predict(model_arima)
 ```
 
+Nos prévisions ne sont pas très précises puisque notre série n'est pas stationnaire.  
+
+
+
+
+# Conclusion
