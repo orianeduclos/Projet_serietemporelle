@@ -281,6 +281,21 @@ Pour ajuster le modèle aux données, nous allons essayer d'estimer les coeffici
 
 # CONTINUER ICI
 
+On l'a déjà fait c'est avec auto.arima()
+
+Si vous voulez qu'on le refasse quand même : 
+
+```{r}
+plot(acf(ts_serie_semaine))
+plot(pacf(ts_serie_semaine))
+```
+
+Interprétation : 
+
+ici q = 7 car pic significatif pour l'ACF
+ici p = je sais pas quel pic est significatif 
+d correspond au nombre de différences nécessaires pour rendre la série temporelle stationnaire, on a déjà fait et d = 1
+
 
 ## Modèle polynomial 
 
@@ -371,7 +386,7 @@ Il aurait été intéressant d'effectuer un test anova pour comparer les modèle
 Suite à notre analyse, nous avons utilisé la fonction forecast pour émettre des prévisions sur notre série pour les 7 prochains jours (en fixant h = 7).
 
 ```{r}
-forecast_cases <- forecast::forecast(model_arima, h = 7)
+forecast_cases <- forecast::forecast(model_arima, h = 365)
 plot(forecast_cases)
 ```
 Les prédictions : 
@@ -395,5 +410,5 @@ plot(ts_serie2,col="red")
 
 # Conclusion
 
-Finalement, notre analyse de l'évolution du nombre de Covid-19 entre 2021 et 2023 nous permet d'affirmer que les prévisions sont compliquées à mettre en place. En effet, ayant une série non stationnaire avec une moyenne et une variance variant dans le temps, la modélisation est d'autant moins fiable. De plus, lors de cette période, nous avons eu des changements structurels avec la mise en place de confinements et de politiques sanitaires spécifiques à la pandémie, pouvant impacter le nombre de nouveaux cas de covid 19. L'analyse de la série aurait été plus fiable et simple si la série avait été stationnaire.
+Finalement, notre analyse de l'évolution du nombre de Covid-19 entre 2021 et 2023 nous permet d'affirmer que les prévisions sont compliquées à mettre en place. En effet, ayant une série non stationnaire avec une moyenne et une variance variant dans le temps, la modélisation est d'autant moins fiable. De plus, lors de cette période, nous avons eu des changements structurels avec la mise en place de confinements et de politiques sanitaires spécifiques à la pandémie, pouvant impacter le nombre de nouveaux cas de covid 19. Ce sont des paramètres que nous ne pouvons prévoir mais qui sont très importants dans les modélisations sur le nombre de cas du covid 19. L'analyse de la série aurait été plus fiable et simple si la série avait été stationnaire.
 Par ailleurs, sur l'analyse de notre sous-série, nous avons pu conclure d'une saisonnalité hebdomadaire, avec un nombre de nouveaux cas en hausse tous les 7 jours.
