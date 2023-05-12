@@ -35,7 +35,11 @@ donnees_fr <- read.csv("covid_france.csv",sep=",")
 summary(donnees_fr)
 ```
 
-Les données ci-dessus comprennent une variable temporelle et une variable caractérisée par un enregistrement journalier des nouveaux cas de Covid-19 en France. 
+Les données ci-dessus comprennent une variable temporelle et une variable caractérisée par un enregistrement journalier des nouveaux cas de Covid-19 en France. \
+Avec ce résumé, nous pouvons voir une étendue très importante du nombre de nouveaux cas de covid-19 sur notre période. En effet, le maximum est de 500 563 nouveaux cas par jour alors que certains jours n'ont enregistrés aucun nouveaux cas. Ce constat nous montre bien une évolution importante de l'épidémie. \
+De plus, la médiane est de 12 174 alors que la moyenne est de 32 315 nouveaux cas par jour. Ceci nous prouve que certains jours présentent des valeurs extrêmes qui impacte la moyenne à la hausse.
+
+Nous allons maintenant identifier la période d'étude : 
 
 ```{r}
 min(donnees_fr$date)
@@ -69,9 +73,9 @@ decomp_ts <- stl(na.omit(ts_donnees_fr), s.window = "periodic")
 autoplot(decomp_ts)
 ```
 
-Cette étape nous permet d'observer une tendance à la hausse entre 2020 et 2022, puis à partir de 2022, une tendance à la baisse. \
-De plus, nous pouvons voir une saisonnalité annuelle.
-
+Cette étape nous permet d'observer une tendance à la hausse entre 2020 et 2022, puis à partir de 2022, une tendance à la baisse. En effet, l'année marquante a été le debut de l'année 2022 car il présente un nombre très important de nouveaux cas de covid en France. \
+De plus, nous pouvons voir une saisonnalité annuelle composée de 2 voire 3 pics, correspondant aux saisons les plus propices à la transmission ou aux mouvements de foule (vacances). \
+Nous pouvons avoir plus d'informations sur ce site web : https://drees.solidarites-sante.gouv.fr/delais-covid19-2023-02-02
 
 ## Division de notre série 
 
@@ -112,12 +116,12 @@ Nous pouvons maintenant les visualiser :
 ```{r}
 plot(ts_serie1,main="Nouveaux cas de covid-19 en France entre 2020 et 2022")
 ```
-Dans cette sous-série, nous pouvons observer une saisonnalité avec des pics lors de la fin de l'année, pouvant correspondre à la période hivernale mais aussi au niveau des vacances scolaires (vers le mois de Mars). Ce constat est expliqué par les mouvements de foule et le déplacement des populations. 
+Dans cette sous-série, nous pouvons observer une saisonnalité avec des pics lors de la fin de l'année, pouvant correspondre à la période hivernale mais aussi au niveau des vacances scolaires (vers le mois de Mars). Ce constat est expliqué par les déplacements de populations et les concentrations de personnes (réunions de famille, lieux festifs).
 
 ```{r}
 plot(ts_serie2,main="Nouveaux cas de covid-19 en France entre 2022 et 2023")
 ```
-Cette seconde série chronologique nous montre une tendance à la baisse des nouveaux cas de covid 19. Aussi, nous remarquons une saisonnalité environ tous les deux mois. Au début de l'année 2021 le nombre de nouveaux cas est nettement plus important qu'en 2022.
+Cette seconde série chronologique nous montre une tendance à la baisse des nouveaux cas de covid 19. Aussi, nous remarquons une saisonnalité environ tous les deux mois. Au début de l'année 2021 le nombre de nouveaux cas est nettement plus important qu'en 2022. Ce constat peut être expliqué par la diminution des tests pour détecter le covid 19.
 
 ```{r}
 plot(ts_serie3,main="Nouveaux cas de covid-19 en France en 2023")
@@ -178,26 +182,26 @@ decomp_ts <- stl(na.omit(ts_serie_semaine), s.window = "periodic")
 autoplot(decomp_ts)
 ```
 
-## Retrait de la tendance / saisonnalité
+## Différenciation de la série
 
 Nous cherchons à nous ramener à une série sans tendance. Afin de la retirer de notre série, nous allons utiliser l'opérateur diff. Nous allons donc construire un filtre permettant de construire notre analyse. \
 
 Tout d'abord, nous avons décider de ne pas transformer notre série en logarithme. Celle-ci nous permettrait de réduire sa variance mais puisque la série présente des valeurs nulles, cette transformation n'est pas pertinente. \
 
-Nous allons donc différencier la série.
+Nous allons donc différencier la série avec la fonction diff. Elle va nous permettre de calculer la différence entre chaque observation et la précédente. Notre objectif est rendre stationnaire la série grâce à cette méthode.
 
 ```{r}
 ndiffs(ts_serie_semaine) # On nous conseille de différencier la série 1 fois
 
-serie_lissee <- ts_serie_semaine |> 
+serie_diff <- ts_serie_semaine |> 
   diff(lag=1)
 
-ndiffs(serie_lissee) # la série a été différencié comme il faut
+ndiffs(serie_diff) # la série a été différencié comme il faut
 ```
 Puisque l'on différencie une seule fois, la variance augmente mais reste plus faible que si l'on avait différencié 3 ou 4 fois par exemple.
 
 ```{r}
-serie_lissee |> 
+serie_diff |> 
   ggtsdisplay(plot.type = "scatter",smooth=FALSE)
 ```
 
@@ -218,17 +222,34 @@ Le nuage de points ne présente plus de direction, il n'existe donc plus de rée
 Ensuite, nous allons tester la stationnarité de notre série :
 
 ```{r}
-kpss.test(serie_lissee)
+kpss.test(serie_diff)
 ```
 Nous avons une p-value associée au test supérieure à 5%, nous rejettons donc l'hypothèse nulle de stationnarité. Notre série n'est donc pas stationnaire.
 
 
 ```{r}
-adf.test(serie_lissee)
+adf.test(serie_diff)
 ```
 Lors de ce test, nous obtenons une p-value inférieure à 5%. Nous acceptons l'hypothèse de non-stationnarité. Ce test nous permet de confirmer notre hypothèse précédente.
 
 En conclusion, notre série n'est pas **stationnaire**. Cette conclusion nous permet de confirmer que la mise en place d'un modèle linéaire n'est pas une solution pour modéliser notre série. Notre série n'étant pas stationnaire, nos différents seront moins fiables et nos prévisions moins précises. 
+
+## Lissage de la série
+
+Puisque notre série n'est pas stationnaire, nous allons essayer d'appliquer un filtre moyenne mobile pour éliminer les fluctuations à court terme.  Nous allons élminer le bruit à court terme pour mettre en évidence les tendances à plus long terme. 
+
+```{r}
+lissage <- c(.5,rep(1,6),.5)/7
+serie_lissage <- serie_diff |> 
+  stats::filter(filter=lissage,sides=2)
+ggtsdisplay(serie_lissage,plot.type = "scatter")
+```
+
+```{r}
+kpss.test(na.omit(serie_lissage))
+adf.test(na.omit(serie_lissage))
+```
+Ce filtre ne rend toujours pas notre série stationnaire, en effet, les p-value nous permettent d'admettre l'hypothèse de non-stationnarité dans les deux cas. Nous allons donc continuer l'étude en considérant que notre série chronologique n'est pas stationnaire. 
 
 # Modélisation de notre série
 
@@ -254,8 +275,14 @@ t_stat(model_arima)
 ```
 Le modèle n'est pas simplifiable.
 
+### Estimation des coefficients p d et q 
 
-### Modèle polynomial 
+Pour ajuster le modèle aux données, nous allons essayer d'estimer les coefficients du modèle ARIMA. 
+
+# CONTINUER ICI
+
+
+## Modèle polynomial 
 
 Avant de pouvoir faire un modèle polynomial, il faut vérifier la normalité des résidus. Nous pouvons effectuer ceci grâce à un test de Shapiro.
 
@@ -341,7 +368,7 @@ Il aurait été intéressant d'effectuer un test anova pour comparer les modèle
 
 # Prévisions 
 
-Suite à notre analyse, nous avons utilisé la fonction forecast pour émettre des prévisions sur notre série pour les 7 prochains jours.
+Suite à notre analyse, nous avons utilisé la fonction forecast pour émettre des prévisions sur notre série pour les 7 prochains jours (en fixant h = 7).
 
 ```{r}
 forecast_cases <- forecast::forecast(model_arima, h = 7)
@@ -356,6 +383,17 @@ predict(model_arima)
 Nos prévisions ne sont pas très précises puisque notre série n'est pas stationnaire.  
 
 
+Afin de rendre notre analyse plus pertinente, nous allons pouvoir comparer si nos prévisions sont en adéquation avec la deuxième sous-série. 
+
+# ANALYSER AVEC LA DEUXIEME SOUS SERIE --> REUSSIR A FAIRE LE GRAPHIQUE 
+
+```{r}
+plot(forecast_cases)
+plot(ts_serie2,col="red")
+```
 
 
 # Conclusion
+
+Finalement, notre analyse de l'évolution du nombre de Covid-19 entre 2021 et 2023 nous permet d'affirmer que les prévisions sont compliquées à mettre en place. En effet, ayant une série non stationnaire avec une moyenne et une variance variant dans le temps, la modélisation est d'autant moins fiable. De plus, lors de cette période, nous avons eu des changements structurels avec la mise en place de confinements et de politiques sanitaires spécifiques à la pandémie, pouvant impacter le nombre de nouveaux cas de covid 19. L'analyse de la série aurait été plus fiable et simple si la série avait été stationnaire.
+Par ailleurs, sur l'analyse de notre sous-série, nous avons pu conclure d'une saisonnalité hebdomadaire, avec un nombre de nouveaux cas en hausse tous les 7 jours.
