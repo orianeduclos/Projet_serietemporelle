@@ -259,7 +259,8 @@ serie_diff <- ts_serie_semaine |>
 serie_diff |> 
   ggtsdisplay(plot.type="scatter")
 ```
-Grâce à cette différenciation, nous avons supprimé la tendance et il ne nous reste plus que la saisonnalité. Les auto-corrélations nous confirment cette hypothèse car nous n'avons plus de fortes valeurs successives dans le graphique comme auparavant.
+Grâce à cette différenciation, nous avons supprimé la tendance et il ne nous reste plus que la saisonnalité. Les auto-corrélations nous confirment cette hypothèse car nous n'avons plus de fortes valeurs successives dans le graphique comme auparavant.\
+Normalement, notre série est bien devenue stationnaire puisque les valeurs sont centrées et fluctuent autour de 0.
 
 
 Suite à cette étape, nous allons tester la stationnarité de la série pour pouvoir continuer l'analyse en toute cohérence. 
@@ -275,71 +276,9 @@ En conclusion, notre série différenciée est bien stationnaire comme le prouve
 
 Nous allons essayer de choisir le meilleur modèle afin d'estimer notre série.
 
-Afin de pouvoir l'estimer, nous avons utiliser la fonction auto.arima() du package forecast qui permet d'effectuer une modélisation automatique. En précisant les arguments trace=T et ic=aic, nous avons donné la main au logiciel R de selectionner le meilleur modèle sur la base du critère AIC. 
-
-## Modèle ARIMA 
-
-Tout d'abord, nous avons établi un modèle ARIMA. Cependant, la seule condition pour que la modélisation soit correct est que la série temporelle modélisée doit être stationnaire. Cette hypothèse explique nos choix précédents de différenciation.
-
-```{r}
-model_arima <- auto.arima(serie_diff, ic = "aic",trace=TRUE)
-model_arima
-```
-
-Modèles identifiés : ARIMA(5,0,0)(1,1,2)
-
-```{r}
-summary(model_arima)
-```
-### Validité du modèle
-
-```{r}
-t_stat(model_arima)
-```
-Le modèle n'est pas simplifiable.
-
-# A MODIFIER 
-Interprétation plus tard, quand on verra si nos sorties bougent : 
-
-L'interprétation des résultats d'un test t.stat(model) dépend du contexte et des variables spécifiques du modèle. Cependant, voici quelques points généraux pour vous guider :
-
-- Pour chaque coefficient dans votre modèle (dans cet exemple, "ar1", "ma1", "sma1"), le test t.stat fournit deux informations clés : la statistique t (t.stat) et la valeur p associée (p.val).
-- La statistique t (t.stat) mesure à quel point l'estimation du coefficient diffère de zéro. Une valeur t plus élevée (en valeur absolue) indique une différence plus importante par rapport à zéro.
-- La valeur p (p.val) est la probabilité associée à la statistique t, et elle mesure la signification statistique du coefficient. Plus la valeur p est petite, plus il est peu probable d'obtenir une telle différence par hasard.
-- Dans l'exemple donné, la statistique t pour "ar1" est de 70.32788, pour "ma1" est de -22.4075 et pour "sma1" est de -4.947629.
-- Les valeurs p correspondantes sont toutes très proches de zéro (0.00000, 0.0000, 0.000001), ce qui suggère que les coefficients sont significativement différents de zéro.
-- En général, si la valeur p est inférieure à un niveau de signification préalablement fixé (par exemple, 0,05), on peut rejeter l'hypothèse nulle selon laquelle le coefficient est égal à zéro et conclure que le coefficient est significativement différent de zéro.
-
-Il est important de souligner que l'interprétation des résultats du test t.stat dépend du contexte et des hypothèses spécifiques du modèle. Il est également important de considérer d'autres facteurs tels que la taille de l'échantillon, l'adéquation du modèle aux données et la validité des hypothèses sous-jacentes.
-
-Pour que le modèle soit valide, il faut vérifier la normalité des résidus.
-
-```{r}
-shapiro.test(model_arima$residuals)
-```
-Le test de Shapiro-Wilk nous permet de prouver que cette hypothèse est bien respectée. 
-
-### Estimation des coefficients p d et q 
-
-Pour ajuster le modèle aux données, nous allons essayer d'estimer les coefficients du modèle ARIMA. 
-Premièrement, nous allons chercher le paramètre p, nombre de termes auto-régressifs. 
-
-Le paramètre d correspond au nombre de fois que nous devons différencier la série pour la rendre stationnaire. 
-
-
-```{r}
-acf(ts_serie_semaine)
-```
-
-Grâce au graphique des auto-corrélations, nous avons identifié que d = 7 car nous avons 4 pics significatifs.
-ici p = je sais pas quel pic est significatif 
-d correspond au nombre de différences nécessaires pour rendre la série temporelle stationnaire, on a déjà fait et d = 1
-
-
 ## Modèle polynomial 
 
 Avant de pouvoir faire un modèle polynomial, il faut vérifier la normalité des résidus. Nous pouvons effectuer ceci grâce à un test de Shapiro.
-
 
 ```{r}
 shapiro.test(ts_serie_semaine)
@@ -356,41 +295,118 @@ plot(diff(ts_serie_semaine, differences = 1),type="l")
 plot(diff(ts_serie_semaine, differences = 2),type="l")
 plot(diff(ts_serie_semaine, differences = 3),type="l")
 plot(diff(ts_serie_semaine, differences = 4),type="l")
-plot(diff(ts_serie_semaine, differences = 5),type="l")
 ```
-Le degré d de la tendance polynomiale est 3. On a un graphique avec d = 3qui est à peu près centré donc on choisit d-1 = 2.\
+
+
+
+Le degré d de la tendance polynomiale est 2. On a un graphique avec d = 2 qui est à peu près centré donc on choisit d-1 = 1.\
 La période est T = 7 car nous avons des données hebdomadaires. \
 
 Nous avons donc créé un modèle polynomial de degré 2 pour modéliser la série. 
-```{r}
-model <- lm(ts_serie_semaine ~ poly(ts_serie_semaine, 2, raw=TRUE))
-summary(model)
-```
-
-
-Nous devons donc avoir 3 régresseurs pour la tendance et 6 régresseurs pour la saisonnalité.
-Il faut génerer les variables explicatives pour ajuster les variables du modèle au sens du MCO. 
+Nous devons donc avoir 2 régresseurs pour la tendance et 6 régresseurs pour la saisonnalité. \
+Il faut générer les variables explicatives pour ajuster les variables du modèle au sens du MCO. 
 
 ```{r}
 t <- 1:length(ts_serie_semaine)
 x <- outer(t,1:6)*(pi/6)
 df <- data.frame(ts_serie_semaine,t,cos(x),sin(x[,-6]))
-# 
-# 
-# x <- matrix(1,nrow=nrow(ts_serie_semaine),ncol=9) # car 9 régresseurs au total
-# t <- 1:nrow(ts_serie_semaine)
-# x[,2] <- t
-# x[,3] <- t**2
-# x[,5] <- cos((2*pi*t)/7)
-# x[,6] <- cos((4*pi*t**2)/7)
-# x[,7] <- sin((2*pi*t)/7)
-# x[,8] <- sin((4*pi*t**2)/7)
 
-ts_serie1_lm <- lm(data=df,ts_serie1~.)
+x <- matrix(1,nrow=nrow(serie1),ncol=8) # car 8 régresseurs au total
+t <- 1:nrow(serie1)
+x[,2] <- t
+x[,3] <- t**2
+x[,5] <- cos((2*pi*t)/7)
+x[,6] <- cos((2*pi*t**2)/7)
+x[,7] <- sin((2*pi*t)/7)
+x[,8] <- sin((2*pi*t**2)/7)
+
+ts_serie1_lm <- lm(data=df,ts_serie_semaine~.)
+```
+
+```{r}
+summary(ts_serie1_lm)
+```
+Cette régression polynomiale semble être peu fiable puisque le R² est de 0.1761. Cependant, le test de significativité globale du modèle est vérifié pour ce modèle. \
+Nous allons ensuite le représenter graphiquement pour voir s'il est en adéquation avec les données. 
+
+```{r}
+plot(ts_serie_semaine)
+lines(ts_serie1_lm$fitted.values,col="red")
+```
+Cette représentation graphique nous permet de voir que le modèle polynomial ne semble pas être le plus adapté pour représenter la série chronologique. 
+
+
+## Modèle auto ARIMA 
+
+Afin de pouvoir l'estimer, nous avons utiliser la fonction auto.arima() du package forecast qui permet d'effectuer une modélisation automatique. En précisant les arguments trace=T et ic=aic, nous avons donné la main au logiciel R de selectionner le meilleur modèle sur la base du critère AIC. 
+
+Nous avons établi un modèle ARIMA. Cependant, la seule condition pour que la modélisation soit correct est que la série temporelle modélisée doit être stationnaire. Cette hypothèse explique nos choix précédents de différenciation.
+
+```{r}
+model_arima <- auto.arima(serie_diff, ic = "aic",trace=TRUE)
+model_arima
+```
+
+Modèles identifiés : ARIMA(5,0,0)(1,1,2)
+
+```{r}
+summary(model_arima)
+```
+
+```{r}
+plot(ts_serie_semaine)
+lines(model_arima$fitted,col="red")
 ```
 
 
-## Etude des résidus 
+### Validité du modèle
+
+```{r}
+t_stat(model_arima)
+```
+Grâce à la fonction t_stat() nous pouvons voir que les coefficients de notre modèle diffèrent beaucoup de 0, en particulier pour les coefficients ar1, ar2 et ar3. En effet, ceux-ci présentent une différence moyenne d'environ 50 de la valeur 0. Les valeurs p correspondantes sont toutes très proches de zéro (0.00000, 0.0000, 0.000001), ce qui suggère que les coefficients sont significativement différents de zéro.
+
+
+Pour que le modèle soit valide, il faut vérifier la normalité des résidus.
+
+```{r}
+shapiro.test(model_arima$residuals)
+```
+Le test de Shapiro-Wilk nous permet de prouver que cette hypothèse est bien respectée. 
+
+## Modèle ARIMA 
+
+Pour ajuster le modèle aux données, nous allons essayer d'estimer les coefficients p d et q du modèle ARIMA.
+
+Premièrement, nous allons chercher le paramètre p, nombre de termes auto-régressifs. Nous avons choisi de déterminer p égal à 0.
+
+Deuxièmement, le paramètre d correspond au nombre de différenciations et nous allons tenter de le déterminer. Puisque notre série n'est pas stationnaire, d est égal à 1. Si nous avons une série déjà stationnarisée, nous aurions choisi 0.
+
+Dernièrement, nous allons trouver q, le nombre de termes de moyenne mobile. Grâce au graphique des auto-corrélations partielles, nous pouvons le choisir. Comme vu précédemment, nous avons déterminé q = 3.
+
+```{r}
+pacf(ts_serie_semaine)
+```
+Après ces différents choix, nous obtenons donc un modèle ARIMA tel que : 
+```{r}
+modele_arima1 <- arima(ts_serie_semaine,order=c(0,1,3))
+summary(modele_arima1)
+```
+
+# Comparaison des modèles 
+
+```{r}
+c(AIC(model_arima),AIC(modele_arima1),AIC(ts_serie1_lm))
+c(BIC(model_arima),BIC(modele_arima1),BIC(ts_serie1_lm))
+```
+
+Nous aurons tendance à privilégier le modèle auto.ARIMA puisque les critères de l'AIC et le BIC sont minimisés. Notre modèle ARIMA manuel a tout de même l'air correct mais il est moins pertinent. Le modèle le moins intéressant est donc le modèle polynomial.
+
+Il aurait été intéressant d'effectuer un test anova pour comparer les modèles. Cependant, nous ne pouvons pas utiliser la méthode anova() sur un objet de classe Arima. 
+
+
+
+# Etude des résidus 
 
 La fonction Box.test examine l’hypothèse nulle de nullité des H premières auto-covariance.
 Par défaut H est fixé à 1, et seule la nullité de l’auto-covariance d’ordre 1 est testée.
@@ -409,32 +425,22 @@ ks.test(ts_serie_semaine, "pnorm", mean(ts_serie_semaine), sd(ts_serie_semaine))
 ```
 Les données ne suivent pas une distribution théorique car la p-value est inférieure à 5%. On rejette donc l'hypothèse nulle.
 
-# Comparaison des modèles 
-
-```{r}
-c(AIC(model_arima),AIC(ts_serie1_lm))
-c(BIC(model_arima),BIC(ts_serie1_lm))
-```
-
-Nous aurons tendance à privilégier le modèle ARIMA puisque les critères de l'AIC et le BIC sont minimisés. Notons qu'un BIC négatif signifie simplement que le modèle est très peu probable par rapport aux données.
-
-Il aurait été intéressant d'effectuer un test anova pour comparer les modèles. Cependant, nous ne pouvons pas utiliser la méthode anova() sur un objet de classe Arima. 
 
 # Prévisions 
 
-Suite à notre analyse, nous avons utilisé la fonction forecast pour émettre des prévisions sur notre série pour les 7 prochains jours (en fixant h = 7).
+Suite à notre analyse, nous avons utilisé la fonction forecast pour émettre des prévisions sur notre série pour les 100 prochains jours (en fixant h = 100).
 
 ```{r}
-forecast_cases <- forecast::forecast(model_arima, h = 365)
+forecast_cases <- forecast::forecast(model_arima, h = 100)
 plot(forecast_cases)
 ```
-Les prédictions : 
+Nous pouvons observer des prévisions assez stables dans le temps. Cependant, nos données correspondant à une pandémie, les prévisions sont d'autant plus compliquées à émettre. 
+
+Nous pouvons observer les valeurs de ces prévisions : 
 
 ```{r}
 predict(model_arima)
 ```
-
-Nos prévisions ne sont pas très précises puisque notre série n'est pas stationnaire.  
 
 Afin de rendre notre analyse plus pertinente, nous allons pouvoir comparer si nos prévisions sont en adéquation avec la deuxième sous-série. 
 
@@ -442,8 +448,12 @@ Afin de rendre notre analyse plus pertinente, nous allons pouvoir comparer si no
 
 ```{r}
 plot(forecast_cases)
-plot(ts_serie2,col="red")
+
+# lines(ts_seri2,col="red")
 ```
+
+
+
 
 ## Lissage exponentiel
 
@@ -455,5 +465,43 @@ pred <- predict(les)
 plot(pred)
 ```
 
+# A INTERPRETER !!
+
+
+# MODIF TS_SERIE_2
+
+```{r}
+ts_serie_semaine2 <- ts(ts_serie2, frequency = 7)
+autoplot(ts_serie_semaine2) # Visualisation des données
+```
+
+
+```{r}
+pacf(ts_serie_semaine2)
+```
+Il faut différencier la série 3 fois.
+
+```{r}
+serie_diff2 <- ts_serie_semaine2 |> 
+  diff(differences = 3) 
+serie_diff2 |> 
+  ggtsdisplay(plot.type="scatter")
+```
+
+Nous allons maintenant tester la stationnarité de la série : 
+```{r}
+adf.test(serie_diff2)
+```
+La p-value associée au test de Dickey-Fuller est inférieure à 5%, cela nous permet donc d'affirmer que la série est bien stationnaire à présent. 
+
+Nous allons donc pouvoir comparer nos prévisions à cette partie de la série pour vérifier la cohérence de nos prévisions.
+
+```{r}
+plot(forecast_cases)
+lines(serie_diff2,col="red")
+```
+```{r}
+serie_diff2
+```
 
 
