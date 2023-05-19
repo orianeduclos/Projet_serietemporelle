@@ -189,13 +189,14 @@ serie_lissage <- ts_serie_semaine |>
   stats::filter(filter=lissage,sides=2)
 ggtsdisplay(serie_lissage,plot.type = "scatter")
 ```
+Cette étape nous permet d'écarter l'hypothèse de linéarité de notre tendance. Nous savons d'ores et déjà que le modèle linéaire ne sera pas adapté à notre série chronologique. Ces graphiques nous permettent tout de même d'identifier une croissance puisque la pandémie s'accentue avec le temps dans notre série.  
+
 
 ```{r}
 plot(ts_serie_semaine,main="Série initiale et série lissée",xlab="Semaines",ylab="Nombre de cas")
 lines(serie_lissage,col='red',lwd=3)
 ```
 Grâce à ce lissage, nous avons isolé la saisonnalité de la série. 
-
 
 
 Nous allons à présent décomposer notre série avec la fonction stl : 
@@ -208,20 +209,21 @@ Cette décomposition nous présente les différentes composantes de notre série
 
 ## Stationnarité 
 
-Nous allons d'abord tester la stationnarité de notre série pour savoir si nous avons besoin de la transformer. 
+Nous allons d'abord tester la stationnarité de notre série pour savoir si nous avons besoin d'effectuer des modifications sur celle-ci. Le premier test que nous avons choisi est celui de Dickey-Fuller :
 
 ```{r}
 adf.test(ts_serie_semaine)
 ```
 
-Dans notre cas, la p-value est supérieure à 5% donc nous rejettons l'hypothèse nulle de non-stationnarité. Ainsi, notre série est bien stationnaire. \
+Dans notre cas, la p-value est supérieure à 5% donc nous acceptons l'hypothèse de non-stationnarité. Notre série est non stationnaire. \
 
 ```{r}
 kpss.test(ts_serie_semaine)
 ```
-Ce second test nous permet aussi de confirmer notre hypothèse de stationnarité. Ainsi, nous n'avons pas besoin de différencier la série pour poursuivre l'analyse puisque notre série est déjà stationnaire.
+Ce second test nous permet aussi de confirmer notre hypothèse de non stationnarité. 
 
-Cette hypothèse va nous permettre d'avoir des estimations correctes et plus fiables. 
+Ainsi, nous avons besoin de différencier la série pour poursuivre l'analyse puisque notre série n'est pas stationnaire. L'hypothèse de stationnarité va nous permettre d'avoir des estimations correctes et plus fiables. 
+
 
 ## Bruit blanc 
 
@@ -230,6 +232,7 @@ Ensuite, nous allons analyser si notre série est un bruit blanc.
 ```{r}
 acf(ts_serie_semaine)
 ```
+
 Nous n'avons pas une série de bruit blanc car les autocorrélations ne se situent pas entre les deux lignes en pointillés bleus. Pour une série de bruit blanc, nous nous attendons à avoir 95% des pics entre ces deux lignes mais ici ce n'est pas le cas donc notre série n'est probablement pas un bruit blanc. 
 
 Nous allons maintenant tesret si la série temporelle peut être différenciée d'un bruit blanc : 
@@ -237,8 +240,36 @@ Nous allons maintenant tesret si la série temporelle peut être différenciée 
 ```{r}
 Box.test(ts_serie_semaine)
 ```
+
 Notre p-value est bien inférieure à 5%, la probabilité que la série soit un bruit blanc est presque nulle.
 
+
+## Différenciation
+
+Nous allons observer les autocorrélations partielles de la série pour savoir comment différencier notre série. La différenciation de la série va nous permettre de rendre la série stationnaire puisqu'elle diminue la variance, élimine la tendance et/ou la saisonnalité.
+
+```{r}
+pacf(ts_serie_semaine)
+```
+Ce graphique nous montre 3 pics importants, nous avons donc choisi de différencier 3 fois notre série. 
+
+```{r}
+serie_diff <- ts_serie_semaine |> 
+  diff(differences = 3) 
+serie_diff |> 
+  ggtsdisplay(plot.type="scatter")
+```
+Grâce à cette différenciation, nous avons supprimé la tendance et il ne nous reste plus que la saisonnalité. Les auto-corrélations nous confirment cette hypothèse car nous n'avons plus de fortes valeurs successives dans le graphique comme auparavant.
+
+
+Suite à cette étape, nous allons tester la stationnarité de la série pour pouvoir continuer l'analyse en toute cohérence. 
+```{r}
+adf.test(serie_diff)
+```
+```{r}
+kpss.test(serie_diff)
+```
+En conclusion, notre série différenciée est bien stationnaire comme le prouve ces deux tests. 
 
 # Modélisation de notre série
 
@@ -248,12 +279,14 @@ Afin de pouvoir l'estimer, nous avons utiliser la fonction auto.arima() du packa
 
 ## Modèle ARIMA 
 
+Tout d'abord, nous avons établi un modèle ARIMA. Cependant, la seule condition pour que la modélisation soit correct est que la série temporelle modélisée doit être stationnaire. Cette hypothèse explique nos choix précédents de différenciation.
+
 ```{r}
-model_arima <- auto.arima(ts_serie_semaine, ic = "aic",trace=TRUE)
+model_arima <- auto.arima(serie_diff, ic = "aic",trace=TRUE)
 model_arima
 ```
 
-Modèles identifiés : ARIMA(1,0,1)(0,1,1)
+Modèles identifiés : ARIMA(5,0,0)(1,1,2)
 
 ```{r}
 summary(model_arima)
@@ -265,7 +298,19 @@ t_stat(model_arima)
 ```
 Le modèle n'est pas simplifiable.
 
-# DIRE A QUOI CORRESPOND T_STAT
+# A MODIFIER 
+Interprétation plus tard, quand on verra si nos sorties bougent : 
+
+L'interprétation des résultats d'un test t.stat(model) dépend du contexte et des variables spécifiques du modèle. Cependant, voici quelques points généraux pour vous guider :
+
+- Pour chaque coefficient dans votre modèle (dans cet exemple, "ar1", "ma1", "sma1"), le test t.stat fournit deux informations clés : la statistique t (t.stat) et la valeur p associée (p.val).
+- La statistique t (t.stat) mesure à quel point l'estimation du coefficient diffère de zéro. Une valeur t plus élevée (en valeur absolue) indique une différence plus importante par rapport à zéro.
+- La valeur p (p.val) est la probabilité associée à la statistique t, et elle mesure la signification statistique du coefficient. Plus la valeur p est petite, plus il est peu probable d'obtenir une telle différence par hasard.
+- Dans l'exemple donné, la statistique t pour "ar1" est de 70.32788, pour "ma1" est de -22.4075 et pour "sma1" est de -4.947629.
+- Les valeurs p correspondantes sont toutes très proches de zéro (0.00000, 0.0000, 0.000001), ce qui suggère que les coefficients sont significativement différents de zéro.
+- En général, si la valeur p est inférieure à un niveau de signification préalablement fixé (par exemple, 0,05), on peut rejeter l'hypothèse nulle selon laquelle le coefficient est égal à zéro et conclure que le coefficient est significativement différent de zéro.
+
+Il est important de souligner que l'interprétation des résultats du test t.stat dépend du contexte et des hypothèses spécifiques du modèle. Il est également important de considérer d'autres facteurs tels que la taille de l'échantillon, l'adéquation du modèle aux données et la validité des hypothèses sous-jacentes.
 
 Pour que le modèle soit valide, il faut vérifier la normalité des résidus.
 
@@ -274,19 +319,19 @@ shapiro.test(model_arima$residuals)
 ```
 Le test de Shapiro-Wilk nous permet de prouver que cette hypothèse est bien respectée. 
 
-
 ### Estimation des coefficients p d et q 
 
 Pour ajuster le modèle aux données, nous allons essayer d'estimer les coefficients du modèle ARIMA. 
+Premièrement, nous allons chercher le paramètre p, nombre de termes auto-régressifs. 
+
+Le paramètre d correspond au nombre de fois que nous devons différencier la série pour la rendre stationnaire. 
+
 
 ```{r}
-plot(acf(ts_serie_semaine))
-plot(pacf(ts_serie_semaine))
+acf(ts_serie_semaine)
 ```
 
-Interprétation : 
-
-ici q = 7 car pic significatif pour l'ACF
+Grâce au graphique des auto-corrélations, nous avons identifié que d = 7 car nous avons 4 pics significatifs.
 ici p = je sais pas quel pic est significatif 
 d correspond au nombre de différences nécessaires pour rendre la série temporelle stationnaire, on a déjà fait et d = 1
 
