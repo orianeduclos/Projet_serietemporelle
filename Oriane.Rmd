@@ -1,19 +1,19 @@
 ---
-title: "Oriane"
-output: html_document
+title: "Projet Covid"
+author : "Margaux Bailleul / Oriane Duclos / Marie Guibert" 
+output: pdf_document
 date: "`r Sys.Date()`"
 ---
 
-```{r}
+```{r message = FALSE}
 library(tidyverse)
 library(forecast)
 library(tidyquant)
-library(tseries)
 library(caschrono)
-
-
+library(stats)
+library(tseries)
+library(lmtest)
 ```
-
 
 # Importations des données 
 
@@ -29,105 +29,17 @@ summary(donnees_modif)
 write.table(x = donnees_modif, file = "covid_france.csv", sep = ",")
 ```
 
-------------------------------
-
-```{r}
-donnees_fr <- read.csv("covid_france.csv",sep=",")
-```
-
-
-
-```{r}
-# Transformation des données en série temporelle
-ts_donnees_fr <- ts(donnees_fr$new_cases, start = c(2020, 1), frequency = 365)
-
-# Division de la série en trois parties
-ts_serie1 <- window(ts_donnees_fr, start = c(2021, 12))
-ts_serie2 <- window(ts_donnees_fr, start = c(2021, 12), end = c(2023, 1))
-ts_serie3 <- window(ts_donnees_fr, start = c(2023, 1), end = c(2023, 1))
-
-# Visualisation des séries
-par(mfrow = c(3, 1))
-plot(ts_serie1, main = "Nouveaux cas de COVID-19 en France entre 2020 et 2021")
-plot(ts_serie2, main = "Nouveaux cas de COVID-19 en France entre 2021 et 2023")
-plot(ts_serie3, main = "Nouveaux cas de COVID-19 en France en 2023")
-
-# Analyse de la première sous-série
-summary(ts_serie1)
-autoplot(ts_serie1) +
-  geom_smooth(method = "loess", color = "blue") +
-  ggtitle("Nouveaux cas de COVID-19 en France entre 2020 et 2021")
-
-# Décomposition de la série en tendance, saisonnalité et résidus
-decomp_serie1 <- stl(ts_serie1, s.window = "periodic")
-autoplot(decomp_serie1)
-
-# Tests de stationnarité
-adf.test(ts_serie1)
-kpss.test(ts_serie1)
-
-# Transformation de la série pour obtenir une stationnarité
-ts_serie1_diff <- diff(ts_serie1, differences = 1)
-autoplot(ts_serie1_diff) +
-  ggtitle("Différence première pour obtenir une stationnarité")
-
-# Tests de stationnarité sur la série différenciée
-adf.test(ts_serie1_diff)
-kpss.test(ts_serie1_diff)
-
-# Identification des paramètres pour un modèle ARIMA
-auto.arima(ts_serie1)
-
-# Modèle ARIMA
-modele_arima <- arima(ts_serie1, order = c(0, 1, 1))
-summary(modele_arima)
-
-# Diagnostic du modèle
-checkresiduals(modele_arima)
-
-# Prévision pour l'année 2022
-forecast_arima <- forecast(modele_arima, h = 365)
-autoplot(forecast_arima) +
-  ggtitle("Prévision des nouveaux cas de COVID-19 en France pour l'année 2022")
-
-# Métriques d'évaluation de la prévision
-accuracy(forecast_arima)
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ```{r}
 donnees_fr <- read.csv("covid_france.csv",sep=",")
 summary(donnees_fr)
 ```
-Les données ci-dessus comprennent une variable temporelle et une variable caractérisée par un enregistrement journalier des nouveaux cas de Covid-19 en France. 
+
+Les données ci-dessus comprennent une variable temporelle et une variable caractérisée par un enregistrement journalier des nouveaux cas de Covid-19 en France. \
+Avec ce résumé, nous pouvons voir une étendue très importante du nombre de nouveaux cas de covid-19 sur notre période. En effet, le maximum est de 500 563 nouveaux cas par jour alors que certains jours n'ont enregistrés aucun nouveaux cas. Ce constat nous montre bien une évolution importante de l'épidémie. \
+De plus, la médiane est de 12 174 alors que la moyenne est de 32 315 nouveaux cas par jour. Ceci nous montre bien l'effet épidémique puisque certaines valeurs enregistrées sont très importantes et fluctuent beaucoup.
+
+Nous allons maintenant identifier la période d'étude : 
 
 ```{r}
 min(donnees_fr$date)
@@ -141,15 +53,29 @@ Premièrement, nous allons transformer nos données en séries temporelles pour 
 
 ```{r}
 ts_donnees_fr <- ts(donnees_fr$new_cases,start = c(2020,1,3), frequency = 365)
-# class(ts_donnees_fr)
+class(ts_donnees_fr)
 ```
 
-# Première partie 
+# Prise en main du jeu de données
 
 ```{r}
 plot(ts_donnees_fr)
 ```
+
 Ce premier graphique nous montre une hausse brutale des nouveaux cas de covids en 2022. Afin de pouvoir continuer notre analyse de façon cohérente, nous allons diviser notre série en 3 parties : avant, pendant et après ce choc en 2022.  
+
+
+Nous allons appliquer la décomposition saisonnière à la série temporelle pour visualiser les tendances et les motifs saisonniers.Nous supprimons les données manquantes afin de ne garder que celles qui sont pertinentes.
+
+```{r}
+decomp_ts <- stl(na.omit(ts_donnees_fr), s.window = "periodic")
+autoplot(decomp_ts)
+```
+
+Cette étape nous permet d'observer une tendance à la hausse entre 2020 et 2022, puis à partir de 2022, une tendance à la baisse. En effet, l'année marquante a été le debut de l'année 2022 car il présente un nombre très important de nouveaux cas de covid en France. \
+De plus, nous pouvons voir une saisonnalité annuelle composée de 2 voire 3 pics, correspondant aux saisons les plus propices à la transmission ou aux mouvements de foule (vacances). \
+Enfin, la partie concernant les résidus nous présente des valeurs importantes, impliquant des complications pour émettre des prévisions.
+Nous pouvons avoir plus d'informations sur ce site web : https://drees.solidarites-sante.gouv.fr/delais-covid19-2023-02-02
 
 ## Division de notre série 
 
@@ -164,43 +90,50 @@ ts_serie1 <- ts(serie1$new_cases,start = c(2020,1,3), frequency = 365)
 
 
 serie2 <- donnees_fr |> 
-  filter(date>"2021-12-22", date<="2023-01-05")
+  filter(date>"2021-12-22",date<="2023-01-05")
 # serie2
-
-ts_serie2 <- ts(serie2$new_cases,start = c(2021,31,12), frequency = 365)
+ts_serie2 <- ts(serie2$new_cases,start = c(2021,23,12),end = c(2023,1,5), frequency = 365)
 
 
 
 serie3 <- donnees_fr |> 
   filter(date>"2023-01-05")
-
+# serie3
 ts_serie3 <- ts(serie3$new_cases,start = c(2023,2,5), frequency = 365)
 ```
 
 Nous avons choisi de scinder notre série en trois périodes : 
+
 - avant le 22 Décembre 2021
+
 - entre le 23 Décembre 2021 et le 5 Janvier 2023
+
 - après le 6 Janvier 2023
+
 
 Nous pouvons maintenant les visualiser : 
 
 ```{r}
-plot(ts_serie1,main="Nouveaux cas de covid-19 en France entre 2020 et 2022")
+plot(ts_serie1,main="Nouveaux cas de covid-19 en France entre 2020 et 2021")
 ```
+Dans cette sous-série, nous pouvons observer une saisonnalité avec des pics lors de la fin de l'année, pouvant correspondre à la période hivernale mais aussi au niveau des vacances scolaires (vers le mois de Mars). Ce constat est expliqué par les déplacements de populations et les concentrations de personnes (réunions de famille, lieux festifs).
 
 ```{r}
-plot(ts_serie2,main="Nouveaux cas de covid-19 en France entre 2022 et 2023")
+plot(ts_serie2,main="Nouveaux cas de covid-19 en France entre 2021 et 2023")
 ```
+Cette seconde série chronologique nous montre une tendance à la baisse des nouveaux cas de covid 19. Aussi, nous remarquons une saisonnalité environ tous les deux mois. Au début de l'année 2021 le nombre de nouveaux cas est nettement plus important qu'en 2022. Ce constat peut être expliqué par la diminution des tests pour détecter le covid 19.
 
 ```{r}
 plot(ts_serie3,main="Nouveaux cas de covid-19 en France en 2023")
 ```
+Enfin, cette sous-série est caractérisée par une tendance à la baisse dans un premier temps puis à la hausse. Ce constat est peut-être expliqué par la reprise de la vie active de la population française.
 
-Grâce à cette division, nous allons pouvoir étudier chaque sous-série pertinemment. 
+Grâce à cette division, nous allons pouvoir sélectionner la sous-série la plus pertinente.
 
-## Analyse de la première sous-série
+# Analyse de la première sous-série
 
 Nous avons décidé de nous focaliser sur la première sous-série. \
+Ce choix est expliqué grâce à notre connaissance des évènements durant cette année particulière. En effet, les confinements ont pu avoir des conséquences sur notre série et nos données.
 Notre étude commence donc le 1er Mars 2020 et s'étend jusqu'au 22 décembre 2021.
 
 Pour rappel, notre série présente une tendance à la hausse comme le montre le graphique ci-dessous. Elle présente aussi une saisonnalité, mais elle n'est pas régulière. En effet, les différentes hausses de nouveaux cas de covid dépendent des confinements et des mesures sanitaires mises en place.
@@ -211,145 +144,451 @@ autoplot(ts_serie1)+
   ggtitle("Nouveaux cas de covids en France entre 2020 et 2022")
 ```
 
-
 On va d'abord chercher à décrire notre série grâce à des indicateurs descriptifs simples.
 
 ```{r}
 mean(ts_serie1)
 ```
+
 Entre le 1er Mars 2020 et le 22 Décembre 2022, la moyenne des nouveaux cas de covids par jour était de 11 763 cas en France.
 
 ```{r}
 ts_serie1 |> 
   ggtsdisplay(plot.type = "scatter",smooth=FALSE)
 ```
-Nous pouvons faire quelques observations sur le graphique de l'ACF. En effet, plusieurs autocorrélations présentent des valeurs significativement non nulles, ce qui signifie que la série chronologique n'est pas aléatoire. 
+
+Nous pouvons faire quelques observations sur le graphique de l'ACF. Ce graphique nous permet de détecter une structure de corrélation du réseau. Dans notre cas, plusieurs autocorrélations présentent des valeurs significativement non nulles, ce qui signifie que la série chronologique n'est pas aléatoire. \
+Aussi, nous pouvons observer un nuage de points plutôt aligné, on peut donc se poser la question d'une éventuelle corrélation.
 
 
-### Transformation en données hebdomadaires 
+Afin d'avoir une analyse plus exhaustive, nous pouvons analyser l'ACF et la PACF. En effet, l'étude de l'ACF va nous permettre de détecter la périodicité de la série. 
 
 ```{r}
-week <-  data.frame(Date = donnees_fr$date, New_cases = donnees_fr$new_cases)
-week <- week |> tq_transmute(select = New_cases,
-                             mutate_fun= apply.weekly,
-                             FUN = sum) 
+acf <- acf(ts_serie1)
+print(data.frame(acf$lag,acf$acf))
+```
 
-week <- week |> flexable()
+Ce graphique nous permet d'observer une corrélation hebdomadaire. En effet, nous pouvons remarquer un pic plus élevé tous les 7 jours. \
+
+Puisque notre série montre une corrélation hebdomadaire, nous avons choisi d'étudier une série temporelle avec une fréquence de 7 jours.
+
+```{r}
+ts_serie_semaine <- ts(ts_serie1, frequency = 7)
+autoplot(ts_serie_semaine) # Visualisation des données
+```
+Ayant choisi d'analyser notre série en série hebdomadaire, l'axe des abscisses change puisqu'il représente le nombre de semaines. Ainsi, entre 2020 et 2022, nous avons environ 100 semaines.
+
+## Décomposition saisonnière
+
+Cette première étape consiste à isoler la saisonnalité de la tendance pour comprendre comment est constitué la série. Nous allons d'abord utiliser les moyennes mobiles : 
+
+```{r}
+lissage <- c(.5,rep(1,6),.5)/7
+serie_lissage <- ts_serie_semaine |> 
+  stats::filter(filter=lissage,sides=2)
+ggtsdisplay(serie_lissage,plot.type = "scatter")
+```
+Cette étape nous permet d'écarter l'hypothèse de linéarité de notre tendance. Nous savons d'ores et déjà que le modèle linéaire ne sera pas adapté à notre série chronologique. Ces graphiques nous permettent tout de même d'identifier une croissance puisque la pandémie s'accentue avec le temps dans notre série.  
+
+
+```{r}
+plot(ts_serie_semaine,main="Série initiale et série lissée",xlab="Semaines",ylab="Nombre de cas")
+lines(serie_lissage,col='red',lwd=3)
+```
+Grâce à ce lissage, nous avons isolé la saisonnalité de la série. 
+
+
+Nous allons à présent décomposer notre série avec la fonction stl : 
+
+```{r}
+decomp_ts <- stl(na.omit(ts_serie_semaine), s.window = "periodic")
+autoplot(decomp_ts)
+```
+Cette décomposition nous présente les différentes composantes de notre série chronologique. Nous pouvons encore observer une importance des résidus, impliquant les mêmes conséquences que précisées ci-dessus.
+
+## Stationnarité 
+
+Nous allons d'abord tester la stationnarité de notre série pour savoir si nous avons besoin d'effectuer des modifications sur celle-ci. Le premier test que nous avons choisi est celui de Dickey-Fuller :
+
+```{r}
+adf.test(ts_serie_semaine)
+```
+
+Dans notre cas, la p-value est supérieure à 5% donc nous acceptons l'hypothèse de non-stationnarité. Notre série est non stationnaire. \
+
+```{r}
+kpss.test(ts_serie_semaine)
+```
+Ce second test nous permet aussi de confirmer notre hypothèse de non stationnarité. 
+
+Ainsi, nous avons besoin de différencier la série pour poursuivre l'analyse puisque notre série n'est pas stationnaire. L'hypothèse de stationnarité va nous permettre d'avoir des estimations correctes et plus fiables. 
+
+
+## Bruit blanc 
+
+Ensuite, nous allons analyser si notre série est un bruit blanc. 
+
+```{r}
+acf(ts_serie_semaine)
+```
+
+Nous n'avons pas une série de bruit blanc car les autocorrélations ne se situent pas entre les deux lignes en pointillés bleus. Pour une série de bruit blanc, nous nous attendons à avoir 95% des pics entre ces deux lignes mais ici ce n'est pas le cas donc notre série n'est probablement pas un bruit blanc. 
+
+Nous allons maintenant tesret si la série temporelle peut être différenciée d'un bruit blanc : 
+
+```{r}
+Box.test(ts_serie_semaine)
+```
+
+Notre p-value est bien inférieure à 5%, la probabilité que la série soit un bruit blanc est presque nulle.
+
+
+## Différenciation
+
+Nous allons observer les autocorrélations partielles de la série pour savoir comment différencier notre série. La différenciation de la série va nous permettre de rendre la série stationnaire puisqu'elle diminue la variance, élimine la tendance et/ou la saisonnalité.
+
+```{r}
+pacf(ts_serie_semaine)
+```
+Ce graphique nous montre 3 pics importants, nous avons donc choisi de différencier 3 fois notre série. 
+
+```{r}
+serie_diff <- ts_serie_semaine |> 
+  diff(differences = 3) 
+serie_diff |> 
+  ggtsdisplay(plot.type="scatter")
+```
+Grâce à cette différenciation, nous avons supprimé la tendance et il ne nous reste plus que la saisonnalité. Les auto-corrélations nous confirment cette hypothèse car nous n'avons plus de fortes valeurs successives dans le graphique comme auparavant.\
+Normalement, notre série est bien devenue stationnaire puisque les valeurs sont centrées et fluctuent autour de 0.
+
+
+Suite à cette étape, nous allons tester la stationnarité de la série pour pouvoir continuer l'analyse en toute cohérence. 
+```{r}
+adf.test(serie_diff)
+```
+```{r}
+kpss.test(serie_diff)
+```
+En conclusion, notre série différenciée est bien stationnaire comme le prouve ces deux tests. 
+
+# Modélisation de notre série
+
+Nous allons essayer de choisir le meilleur modèle afin d'estimer notre série.
+
+
+## Modèle polynomial 
+
+Avant de pouvoir faire un modèle polynomial, il faut vérifier la normalité des résidus. Nous pouvons effectuer ceci grâce à un test de Shapiro.
+
+```{r}
+shapiro.test(ts_serie_semaine)
+```
+
+La p-value est inférieure à 5%, ce qui nous amène à rejeter l'hypothèse nulle. Nos résidus suivent donc une loi normale. 
+
+Nous pouvons alors construire notre modèle polynomial. 
+
+Il peut être utile de modéliser le nombre de nouveaux cas de COVID-19 en utilisant une méthode de régression polynomiale. Les données montrent une tendance générale à la hausse au fil du temps, une régression polynomiale peut être utilisée pour décrire cette tendance. 
+
+```{r}
+plot(diff(ts_serie_semaine, differences = 1),type="l")
+plot(diff(ts_serie_semaine, differences = 2),type="l")
+plot(diff(ts_serie_semaine, differences = 3),type="l")
+plot(diff(ts_serie_semaine, differences = 4),type="l")
 ```
 
 
 
-### Stationnarité
+Le degré d de la tendance polynomiale est 2. On a un graphique avec d = 2 qui est à peu près centré donc on choisit d-1 = 1.\
+La période est T = 7 car nous avons des données hebdomadaires. \
 
-Ensuite, nous cherchons à nous ramener à une série stationnaire. Pour cela, nous devons éliminer la tendance linéaire. Afin de stationariser notre série, nous allons utiliser l'opérateur diff. \
-
-Tout d'abord, nous avons décider de ne pas transformer notre série en logarithme. Celle-ci nous permettrait de réduire sa variance mais puisque la série présente des valeurs nulles, cette transformation n'est pas pertinente. \
-
-Nous allons donc différencier la série : 
+Nous avons donc créé un modèle polynomial de degré 2 pour modéliser la série. 
+Nous devons donc avoir 2 régresseurs pour la tendance et 6 régresseurs pour la saisonnalité. \
+Il faut générer les variables explicatives pour ajuster les variables du modèle au sens du MCO. 
 
 ```{r}
-ndiffs(ts_serie1) # On nous conseille de différencier la série 1 fois
+t <- 1:length(ts_serie_semaine)
+x <- outer(t,1:6)*(pi/6)
+df <- data.frame(ts_serie_semaine,t,cos(x),sin(x[,-6]))
 
-serie_lissee <- ts_serie1 |> 
-  diff(lag=1)
+x <- matrix(1,nrow=nrow(serie1),ncol=8) # car 8 régresseurs au total
+t <- 1:nrow(serie1)
+x[,2] <- t
+x[,3] <- t**2
+x[,5] <- cos((2*pi*t)/7)
+x[,6] <- cos((2*pi*t**2)/7)
+x[,7] <- sin((2*pi*t)/7)
+x[,8] <- sin((2*pi*t**2)/7)
 
-ndiffs(serie_lissee) # la série a été différencié comme il faut
+ts_serie1_lm <- lm(data=df,ts_serie_semaine~.)
 ```
 
 ```{r}
-serie_lissee |> 
-  forecast::ggtsdisplay(plot.type= "scatter")
+summary(ts_serie1_lm)
 ```
-Grâce à notre différenciation, nous avons pu stationariser notre série et supprimer la tendance. 
+Cette régression polynomiale semble être peu fiable puisque le R² est de 0.1761. Cependant, le test de significativité globale du modèle est vérifié pour ce modèle. \
+Nous allons ensuite le représenter graphiquement pour voir s'il est en adéquation avec les données. 
 
 ```{r}
-kpss.test(serie_lissee)
-ts.plot(serie_lissee, main = "Serie différenciée", col ="blue")
+plot(ts_serie_semaine)
+lines(ts_serie1_lm$fitted.values,col="red")
 ```
+Cette représentation graphique nous permet de voir que le modèle polynomial ne semble pas être le plus adapté pour représenter la série chronologique. 
 
 
 
-
-### Détection de l'autocorrélation partielle et identification des degrés p et q 
-
-Afin de détecter la présence d'autocorrélation partielle, nous allons utiliser la fonction pacf. Elle nous permet de mesurer l'aurocorrélation d'un signal pour un décalage k "indépendamment" des autocorrélations pour les décalages inférieurs. \
-Nous avons choisi d'utiliser cette fonction car le corrélogramme produit par la fonction ggdisplay montre des autocorrélations fortes à répétition.
 
 
 ```{r}
-pacf(serie_lissee)
+# # Initialiser les valeurs d'AIC
+# min_aic <- Inf # permet de suivre la valeur minimum de l'AIC rencontrée lors de l'itération des différentes valeurs de p
+# best_p <- 0 # ariable sera mise à jou
+# 
+# # Tester différentes valeurs de p
+# for (p in 1:10) {
+#   model <- arima(serie_diff, order=c(p, 0, 0))
+#   aic <- AIC(model)
+#   
+#   if (aic < min_aic) {
+#     min_aic <- aic
+#     best_p <- p
+#   }
+# }
+# 
+# 
+# cat("Valeur de p identifiée :", best_p, "\n")
+# 
+# model_ar <- ar(serie_diff, order=best_p)
+
 ```
 
+
+
+
+## Modèle auto ARIMA 
+
+Afin de pouvoir l'estimer, nous avons utiliser la fonction auto.arima() du package forecast qui permet d'effectuer une modélisation automatique. En précisant les arguments trace=T et ic=aic, nous avons donné la main au logiciel R de selectionner le meilleur modèle sur la base du critère AIC. 
+
+Nous avons établi un modèle ARIMA. Cependant, la seule condition pour que la modélisation soit correct est que la série temporelle modélisée doit être stationnaire. Cette hypothèse explique nos choix précédents de différenciation.
 
 ```{r}
-acf2y(serie_lissee,lag.max = 15)
+model_arima <- auto.arima(serie_diff, ic = "aic",trace=TRUE)
+model_arima
 ```
 
-On choisit p=2 et q= 2 
-
-## Sous serie par semaine 
-
-
-```{r}
-serie1 <- donnees_fr |> 
-  filter(date<="2021-12-22")
-# serie1
-ts_serie1 <- ts(serie1$new_cases,start = c(2020,1,3), frequency = 365)
-
-
-```
-
-# A INTERPRETER
-
-### Estimation du modèle
-
-Afin de pouvoir estimer le modèle, nous avons utiliser la fonction auto.arima() du pakage forecast qui permet d'effectuer une modélisation automatique. En précisant les arguments trace=T et ic=aic, nous avons donner la main au logiciel R de selectionner le meilleur modèle sur la base du critère AIC 
-
-## ARIMA ?
-
-```{r}
-model_arima <- auto.arima(serie_lissee, trace=T, ic = "aic")
-```
-
-Modèle identifier : ARIMA(4,0,4)
+Modèles identifiés : ARIMA(5,0,0)(1,1,2)
 
 ```{r}
 summary(model_arima)
 ```
 
 ```{r}
+plot(ts_serie_semaine)
+lines(model_arima$fitted,col="red")
+```
+
+
+### Validité du modèle
+
+```{r}
 t_stat(model_arima)
 ```
+Grâce à la fonction t_stat() nous pouvons voir que les coefficients de notre modèle diffèrent beaucoup de 0, en particulier pour les coefficients ar1, ar2 et ar3. En effet, ceux-ci présentent une différence moyenne d'environ 50 de la valeur 0. Les valeurs p correspondantes sont toutes très proches de zéro (0.00000, 0.0000, 0.000001), ce qui suggère que les coefficients sont significativement différents de zéro.
 
-Le modèle n'est pas simplifiable
 
-## Validation du modèle (validation interne)
-
-```{r}
-Box.test(model_arima$residuals, lag = 10, type= "Ljung-Box")
-```
-Pas très efficae ?? Vous en pensez quoi ? p_value pas acceptable 
-
+Pour que le modèle soit valide, il faut vérifier la normalité des résidus.
 
 ```{r}
-checkresiduals(model_arima)
+shapiro.test(model_arima$residuals)
 ```
+Le test de Shapiro-Wilk nous permet de prouver que cette hypothèse est bien respectée. 
 
+## Modèle ARIMA 
 
-# ARMA ?
+Pour ajuster le modèle aux données, nous allons essayer d'estimer les coefficients p d et q du modèle ARIMA.
+
+Premièrement, nous allons chercher le paramètre p, nombre de termes auto-régressifs. Nous avons choisi de déterminer p égal à 0.
+
+Deuxièmement, le paramètre d correspond au nombre de différenciations et nous allons tenter de le déterminer. Puisque notre série n'est pas stationnaire, d est égal à 1. Si nous avons une série déjà stationnarisée, nous aurions choisi 0.
+
+Dernièrement, nous allons trouver q, le nombre de termes de moyenne mobile. Grâce au graphique des auto-corrélations partielles, nous pouvons le choisir. Comme vu précédemment, nous avons déterminé q = 3.
 
 ```{r}
-# auto.arima(serie_lissee,d=1,D=1,stepwise = FALSE,approximation=FALSE,trace=TRUE)
+pacf(ts_serie_semaine)
+```
+Après ces différents choix, nous obtenons donc un modèle ARIMA tel que : 
+```{r}
+modele_arima1 <- arima(ts_serie_semaine,order=c(0,1,3))
+summary(modele_arima1)
+```
+
+## Modele ARMA 
+
+Construisons un modèle ARMA à partir de notre série différenciée. 
+
+Si nous reutilisons les valeurs de p et q identifier plus haut.
+
+```{r}
+model_arma <- arima(serie_diff, order=c(0, 0, 3))
+```
+
+```{r}
+summary(model_arma)
 ```
 
 
-## Prévisions
+
+```{r}
+# # Initialiser les valeurs d'AIC
+# min_aic <- Inf # permet de suivre la valeur minimum de l'AIC rencontrée lors de l'itération des différentes valeurs de p
+# best_p <- 0 # ariable sera mise à jou
+# 
+# # Tester différentes valeurs de p
+# for (p in 1:10) {
+#   model <- arima(serie_diff, order=c(p, 0, 0))
+#   aic <- AIC(model)
+#   
+#   if (aic < min_aic) {
+#     min_aic <- aic
+#     best_p <- p
+#   }
+# }
+# 
+# 
+# cat("Valeur de p identifiée :", best_p, "\n")
+# 
+# model_ar <- ar(serie_diff, order=best_p)
+
+```
+
+
+
+# Comparaison des modèles 
+
+```{r}
+c(AIC(model_arima),AIC(modele_arima1),AIC(ts_serie1_lm), AIC(model_arma))
+c(BIC(model_arima),BIC(modele_arima1),BIC(ts_serie1_lm), BIC(model_arma))
+```
+
+Nous aurons tendance à privilégier le modèle auto.ARIMA puisque les critères de l'AIC et le BIC sont minimisés. Notre modèle ARIMA manuel a tout de même l'air correct mais il est moins pertinent. Le modèle le moins intéressant est donc le modèle polynomial.
+
+Il aurait été intéressant d'effectuer un test anova pour comparer les modèles. Cependant, nous ne pouvons pas utiliser la méthode anova() sur un objet de classe Arima. 
+
+
+
+# Etude des résidus 
+
+La fonction Box.test examine l’hypothèse nulle de nullité des H premières auto-covariance.
+Par défaut H est fixé à 1, et seule la nullité de l’auto-covariance d’ordre 1 est testée.
+
+Pour tester si la série peut-être apparentée à un bruit blanc, nous fixerons un H de l’ordre de 7.
+
+```{r}
+Box.test(ts_serie_semaine,lag=7)
+```
+Puisque la p-value est inférieure à 5%, on rejette l'hypothèse de non-autocorrélation. Cela implique que la série temporelle présente une autocorrélation significative et que les valeurs successives de la série temporelle sont dépendantes les unes des autres.
+
+La fonction ks.test() est une fonction de test de Kolmogorov-Smirnov dans R, qui permet de comparer une distribution empirique à une distribution théorique normale.
+
+```{r}
+ks.test(ts_serie_semaine, "pnorm", mean(ts_serie_semaine), sd(ts_serie_semaine))
+```
+Les données ne suivent pas une distribution théorique car la p-value est inférieure à 5%. On rejette donc l'hypothèse nulle.
+Ce qui suggère que l'écart entre la distribution empirique et la distribution théorique est statistiquement significatif.
+
+
+# Prévisions 
+
+Suite à notre analyse, nous avons utilisé la fonction forecast pour émettre des prévisions sur notre série pour les 100 prochains jours (en fixant h = 100).
+
+```{r}
+forecast_cases <- forecast::forecast(model_arima, h = 100)
+plot(forecast_cases)
+```
+Nous pouvons observer des prévisions assez stables dans le temps. Cependant, nos données correspondant à une pandémie, les prévisions sont d'autant plus compliquées à émettre. 
+
+Nous pouvons observer les valeurs de ces prévisions : 
+
+```{r}
+predict(model_arima)
+```
+
+
+La valeur de la prédiction est de -14697 , ce qui représente le niveau de la série temporelle attendu pour la période prédite.
+La deuxième partie de la sortie ($se) donne l'erreur standard de la prédiction, qui est de 6188.18. Cela indique la précision de la prédiction et permet d'estimer l'intervalle de confiance autour de la valeur prédite.
+
+Afin de rendre notre analyse plus pertinente, nous allons pouvoir comparer si nos prévisions sont en adéquation avec la deuxième sous-série. 
+
+# ANALYSER AVEC LA DEUXIEME SOUS SERIE --> REUSSIR A FAIRE LE GRAPHIQUE 
+
+```{r}
+plot(forecast_cases)
+
+```
 
 
 
 
+## Lissage exponentiel
+
+Nous allons tenter de réaliser des prévisions avec un lissage exponentiel : 
+
+```{r}
+les <- ets(ts_serie_semaine,model="ANN") # méthode de lissage exponentiel triple (ETS) avec un modèle de réseau de neurones artificiels (ANN).
+pred <- predict(les) #génère des prédictions à l'aide du modèle ETS entraîné précédemment
+plot(pred) #trace un graphique des prédictions 
+```
+
+# A INTERPRETER !!
+
+Le code, ci dessus, ajuste un modèle ETS avec un modèle de réseau de neurones artificiels à une série temporelle ts_serie_semaine, puis génère des prédictions à l'aide de ce modèle et les affiche sur un graphique. Ici, sur le graphique on l'observe en bleu. 
 
 
 
+# MODIF TS_SERIE_2
+
+```{r}
+ts_serie_semaine2 <- ts(ts_serie2, frequency = 7)
+autoplot(ts_serie_semaine2) # Visualisation des données
+```
+
+
+```{r}
+pacf(ts_serie_semaine2)
+```
+Il faut différencier la série 3 fois.
+
+```{r}
+serie_diff2 <- ts_serie_semaine2 |> 
+  diff(differences = 3) 
+serie_diff2 |> 
+  ggtsdisplay(plot.type="scatter")
+```
+
+Nous allons maintenant tester la stationnarité de la série : 
+```{r}
+adf.test(serie_diff2)
+```
+La p-value associée au test de Dickey-Fuller est inférieure à 5%, cela nous permet donc d'affirmer que la série est bien stationnaire à présent. 
+
+Nous allons donc pouvoir comparer nos prévisions à cette partie de la série pour vérifier la cohérence de nos prévisions.
+
+```{r}
+plot(forecast_cases)
+
+#lines(serie_diff2,col="red", lwd = 2, lty = "dashed")
+
+
+# Définissez les coordonnées de départ de la ligne
+x_start <- 103
+y_start <- 50000
+
+# Tracez la ligne
+lines(x = c(x_start, 10), y = c(y_start, 10), col = "red")
+
+```
+```{r}
+
+```
 
 
