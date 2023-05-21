@@ -5,7 +5,7 @@ output: pdf_document
 date: "`r Sys.Date()`"
 ---
 
-```{r message = FALSE}
+```{r message=FALSE, include=FALSE}
 library(tidyverse)
 library(forecast)
 library(tidyquant)
@@ -15,11 +15,14 @@ library(tseries)
 library(lmtest)
 ```
 
+La pandémie mondiale de COVID-19 a eu un impact sans précédent sur les sociétés du monde entier, mettant à l'épreuve nos systèmes de santé, notre économie et notre façon de vivre. Comprendre l'évolution des cas de COVID-19 au fil du temps est essentiel pour évaluer l'efficacité des mesures prises et pour anticiper les tendances futures. Cette étude de série temporelle vise à apporter des connaissances approfondies sur les tendances des cas de COVID-19 en France. 
+
+
 # Importations des données 
 
 Tout d'abord, on importe les données et on sélectionne les données concernant la France. 
 
-```{r eval=FALSE, include=FALSE}
+```{r eval=FALSE, include=FALSE, results='hold'}
 donnees <- read.csv("owid-covid-data.csv",sep=",",stringsAsFactors = T)
 donnees_modif <- donnees |> 
   filter(iso_code == "FRA") |> 
@@ -30,7 +33,7 @@ write.table(x = donnees_modif, file = "covid_france.csv", sep = ",")
 ```
 
 
-```{r}
+```{r, results='hold'}
 donnees_fr <- read.csv("covid_france.csv",sep=",")
 summary(donnees_fr)
 ```
@@ -41,7 +44,7 @@ De plus, la médiane est de 12 174 alors que la moyenne est de 32 315 nouveaux c
 
 Nous allons maintenant identifier la période d'étude : 
 
-```{r}
+```{r,results='hold'}
 min(donnees_fr$date)
 max(donnees_fr$date)
 ```
@@ -51,7 +54,7 @@ Grâce à cette étape, nous pouvons observer que notre série temporelle début
 
 Premièrement, nous allons transformer nos données en séries temporelles pour pouvoir réaliser notre analyse. 
 
-```{r}
+```{r,results='hold'}
 ts_donnees_fr <- ts(donnees_fr$new_cases,start = c(2020,1,3), frequency = 365)
 class(ts_donnees_fr)
 ```
@@ -146,7 +149,7 @@ autoplot(ts_serie1)+
 
 On va d'abord chercher à décrire notre série grâce à des indicateurs descriptifs simples.
 
-```{r}
+```{r,results='hold'}
 mean(ts_serie1)
 ```
 
@@ -182,7 +185,7 @@ Ayant choisi d'analyser notre série en série hebdomadaire, l'axe des abscisses
 
 Cette première étape consiste à isoler la saisonnalité de la tendance pour comprendre comment est constitué la série. Nous allons d'abord utiliser les moyennes mobiles : 
 
-```{r}
+```{r message=FALSE}
 lissage <- c(.5,rep(1,6),.5)/7
 serie_lissage <- ts_serie_semaine |> 
   stats::filter(filter=lissage,sides=2)
@@ -210,13 +213,13 @@ Cette décomposition nous présente les différentes composantes de notre série
 
 Nous allons d'abord tester la stationnarité de notre série pour savoir si nous avons besoin d'effectuer des modifications sur celle-ci. Le premier test que nous avons choisi est celui de Dickey-Fuller :
 
-```{r}
+```{r ,results='hold'}
 adf.test(ts_serie_semaine)
 ```
 
 Dans notre cas, la p-value est supérieure à 5% donc nous acceptons l'hypothèse de non-stationnarité. Notre série est non stationnaire. \
 
-```{r}
+```{r,results='hold'}
 kpss.test(ts_serie_semaine)
 ```
 Ce second test nous permet aussi de confirmer notre hypothèse de non stationnarité. 
@@ -236,7 +239,7 @@ Nous n'avons pas une série de bruit blanc car les autocorrélations ne se situe
 
 Nous allons maintenant tesret si la série temporelle peut être différenciée d'un bruit blanc : 
 
-```{r}
+```{r,results='hold'}
 Box.test(ts_serie_semaine)
 ```
 
@@ -263,10 +266,10 @@ Normalement, notre série est bien devenue stationnaire puisque les valeurs sont
 
 
 Suite à cette étape, nous allons tester la stationnarité de la série pour pouvoir continuer l'analyse en toute cohérence. 
-```{r}
+```{r,results='hold'}
 adf.test(serie_diff)
 ```
-```{r}
+```{r,results='hold'}
 kpss.test(serie_diff)
 ```
 En conclusion, notre série différenciée est bien stationnaire comme le prouve ces deux tests. 
@@ -280,7 +283,7 @@ Nous allons essayer de choisir le meilleur modèle afin d'estimer notre série.
 
 Avant de pouvoir faire un modèle polynomial, il faut vérifier la normalité des résidus. Nous pouvons effectuer ceci grâce à un test de Shapiro.
 
-```{r}
+```{r,results='hold'}
 shapiro.test(ts_serie_semaine)
 ```
 
@@ -306,7 +309,7 @@ Nous avons donc créé un modèle polynomial de degré 2 pour modéliser la sér
 Nous devons donc avoir 2 régresseurs pour la tendance et 6 régresseurs pour la saisonnalité. \
 Il faut générer les variables explicatives pour ajuster les variables du modèle au sens du MCO. 
 
-```{r}
+```{r,results='hold'}
 t <- 1:length(ts_serie_semaine)
 x <- outer(t,1:6)*(pi/6)
 df <- data.frame(ts_serie_semaine,t,cos(x),sin(x[,-6]))
@@ -371,14 +374,14 @@ Afin de pouvoir l'estimer, nous avons utiliser la fonction auto.arima() du packa
 
 Nous avons établi un modèle ARIMA. Cependant, la seule condition pour que la modélisation soit correct est que la série temporelle modélisée doit être stationnaire. Cette hypothèse explique nos choix précédents de différenciation.
 
-```{r}
+```{r,results='hold'}
 model_arima <- auto.arima(serie_diff, ic = "aic",trace=TRUE)
 model_arima
 ```
 
 Modèles identifiés : ARIMA(5,0,0)(1,1,2)
 
-```{r}
+```{r,results='hold'}
 summary(model_arima)
 ```
 
@@ -390,7 +393,7 @@ lines(model_arima$fitted,col="red")
 
 ### Validité du modèle
 
-```{r}
+```{r,results='hold'}
 t_stat(model_arima)
 ```
 Grâce à la fonction t_stat() nous pouvons voir que les coefficients de notre modèle diffèrent beaucoup de 0, en particulier pour les coefficients ar1, ar2 et ar3. En effet, ceux-ci présentent une différence moyenne d'environ 50 de la valeur 0. Les valeurs p correspondantes sont toutes très proches de zéro (0.00000, 0.0000, 0.000001), ce qui suggère que les coefficients sont significativement différents de zéro.
@@ -398,7 +401,7 @@ Grâce à la fonction t_stat() nous pouvons voir que les coefficients de notre m
 
 Pour que le modèle soit valide, il faut vérifier la normalité des résidus.
 
-```{r}
+```{r,results='hold'}
 shapiro.test(model_arima$residuals)
 ```
 Le test de Shapiro-Wilk nous permet de prouver que cette hypothèse est bien respectée. 
@@ -417,7 +420,7 @@ Dernièrement, nous allons trouver q, le nombre de termes de moyenne mobile. Gr�
 pacf(ts_serie_semaine)
 ```
 Après ces différents choix, nous obtenons donc un modèle ARIMA tel que : 
-```{r}
+```{r,results='hold'}
 modele_arima1 <- arima(ts_serie_semaine,order=c(0,1,3))
 summary(modele_arima1)
 ```
@@ -432,7 +435,7 @@ Si nous reutilisons les valeurs de p et q identifier plus haut.
 model_arma <- arima(serie_diff, order=c(0, 0, 3))
 ```
 
-```{r}
+```{r,results='hold'}
 summary(model_arma)
 ```
 
@@ -465,7 +468,7 @@ summary(model_arma)
 
 # Comparaison des modèles 
 
-```{r}
+```{r,results='hold'}
 c(AIC(model_arima),AIC(modele_arima1),AIC(ts_serie1_lm), AIC(model_arma))
 c(BIC(model_arima),BIC(modele_arima1),BIC(ts_serie1_lm), BIC(model_arma))
 ```
@@ -483,14 +486,14 @@ Par défaut H est fixé à 1, et seule la nullité de l’auto-covariance d’or
 
 Pour tester si la série peut-être apparentée à un bruit blanc, nous fixerons un H de l’ordre de 7.
 
-```{r}
+```{r,results='hold'}
 Box.test(ts_serie_semaine,lag=7)
 ```
 Puisque la p-value est inférieure à 5%, on rejette l'hypothèse de non-autocorrélation. Cela implique que la série temporelle présente une autocorrélation significative et que les valeurs successives de la série temporelle sont dépendantes les unes des autres.
 
 La fonction ks.test() est une fonction de test de Kolmogorov-Smirnov dans R, qui permet de comparer une distribution empirique à une distribution théorique normale.
 
-```{r}
+```{r,results='hold'}
 ks.test(ts_serie_semaine, "pnorm", mean(ts_serie_semaine), sd(ts_serie_semaine))
 ```
 Les données ne suivent pas une distribution théorique car la p-value est inférieure à 5%. On rejette donc l'hypothèse nulle.
@@ -509,7 +512,7 @@ Nous pouvons observer des prévisions assez stables dans le temps. Cependant, no
 
 Nous pouvons observer les valeurs de ces prévisions : 
 
-```{r}
+```{r,results='hold'}
 predict(model_arima)
 ```
 
@@ -566,7 +569,7 @@ serie_diff2 |>
 ```
 
 Nous allons maintenant tester la stationnarité de la série : 
-```{r}
+```{r,results='hold'}
 adf.test(serie_diff2)
 ```
 La p-value associée au test de Dickey-Fuller est inférieure à 5%, cela nous permet donc d'affirmer que la série est bien stationnaire à présent. 
