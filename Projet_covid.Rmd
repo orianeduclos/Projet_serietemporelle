@@ -62,6 +62,8 @@ class(ts_donnees_fr)
 
 # Prise en main du jeu de données
 
+## Visualisation globale de notre série
+
 ```{r}
 plot(ts_donnees_fr)
 ```
@@ -75,9 +77,9 @@ decomp_ts <- stl(na.omit(ts_donnees_fr), s.window = "periodic")
 autoplot(decomp_ts)
 ```
 
-Cette étape nous permet d'observer une tendance à la hausse entre 2020 et 2022, puis à partir de 2022, une tendance à la baisse. En effet, l'année marquante a été le debut de l'année 2022 car il présente un nombre très important de nouveaux cas de covid en France.\
-De plus, nous pouvons voir une saisonnalité annuelle composée de 2 voire 3 pics, correspondant aux saisons les plus propices à la transmission ou aux mouvements de foule (vacances).\
-Enfin, la partie concernant les résidus nous présente des valeurs importantes, impliquant des complications pour émettre des prévisions. Nous pouvons avoir plus d'informations sur ce site web : <https://drees.solidarites-sante.gouv.fr/delais-covid19-2023-02-02>
+Grâce au graphique "trend", nous pouvons observer une tendance à la hausse entre 2020 et 2022, puis à partir de 2022, une tendance à la baisse. En effet, l'année marquante a été le debut de l'année 2022 car il présente un nombre très important de nouveaux cas de covid en France.\
+De plus, grâce au graphique "seasonal", nous pouvons observer une saisonnalité annuelle composée de 2 voire 3 pics, correspondant aux saisons les plus propices à la transmission ou aux mouvements de foule (vacances).\
+Enfin, la partie concernant les résidus (graphique "remainder") nous présente des valeurs importantes, impliquant des complications pour émettre des prévisions. Nous pouvons avoir plus d'informations sur ce site web : <https://drees.solidarites-sante.gouv.fr/delais-covid19-2023-02-02>
 
 ## Division de notre série
 
@@ -89,14 +91,10 @@ serie1 <- donnees_fr |>
 # serie1
 ts_serie1 <- ts(serie1$new_cases,start = c(2020,1,3), frequency = 365)
 
-
-
 serie2 <- donnees_fr |> 
   filter(date>"2021-12-22",date<="2023-01-05")
 # serie2
 ts_serie2 <- ts(serie2$new_cases,start = c(2021,23,12),end = c(2023,1,5), frequency = 365)
-
-
 
 serie3 <- donnees_fr |> 
   filter(date>"2023-01-05")
@@ -112,19 +110,23 @@ Nous avons choisi de scinder notre série en trois périodes :
 
 -   après le 6 Janvier 2023
 
+## Visualisation de chaque sous-série
+
 Nous pouvons maintenant les visualiser :
 
 ```{r}
 plot(ts_serie1,main="Nouveaux cas de covid-19 en France entre 2020 et 2022")
 ```
 
-Dans cette sous-série, nous pouvons observer une saisonnalité avec des pics lors de la fin de l'année, pouvant correspondre à la période hivernale mais aussi au niveau des vacances scolaires (vers le mois de Mars). Ce constat est expliqué par les déplacements de populations et les concentrations de personnes (réunions de famille, lieux festifs).
+Dans cette sous-série, nous pouvons observer une saisonnalité avec des pics lors de la fin de l'année, pouvant correspondre à la période hivernale mais aussi à la période des vacances scolaires (vers le mois de Mars). Ce constat est expliqué par les déplacements de population et les concentrations de personnes (réunions de famille, lieux festifs).
 
 ```{r}
 plot(ts_serie2,main="Nouveaux cas de covid-19 en France entre 2021 et 2023")
 ```
 
 Cette seconde série chronologique nous montre une tendance à la baisse des nouveaux cas de covid 19. Aussi, nous remarquons une saisonnalité environ tous les deux mois. Au début de l'année 2021 le nombre de nouveaux cas est nettement plus important qu'en 2022. Ce constat peut être expliqué par la diminution des tests pour détecter le covid 19.
+
+# problème d'interprétation ? voir avec Marie 
 
 ```{r}
 plot(ts_serie3,main="Nouveaux cas de covid-19 en France en 2023")
@@ -138,6 +140,8 @@ Grâce à cette division, nous allons pouvoir sélectionner la sous-série la pl
 
 Nous avons décidé de nous focaliser sur la première sous-série.\
 Ce choix est expliqué grâce à notre connaissance des évènements durant cette année particulière. En effet, les confinements ont pu avoir des conséquences sur notre série et nos données. Notre étude commence donc le 1er Mars 2020 et s'étend jusqu'au 22 décembre 2021.
+
+## Visualisation générale
 
 Pour rappel, notre série présente une tendance à la hausse comme le montre le graphique ci-dessous. Elle présente aussi une saisonnalité, mais elle n'est pas régulière. En effet, les différentes hausses de nouveaux cas de covid dépendent des confinements et des mesures sanitaires mises en place.
 
@@ -153,7 +157,7 @@ On va d'abord chercher à décrire notre série grâce à des indicateurs descri
 mean(ts_serie1)
 ```
 
-Entre le 1er Mars 2020 et le 22 Décembre 2022, la moyenne des nouveaux cas de covids par jour était de 11 763 cas en France.
+Entre le 1er Mars 2020 et le 22 Décembre 2022, la moyenne des nouveaux cas de covid 19 par jour en France était de 11 763 cas.
 
 ```{r}
 ts_serie1 |> 
@@ -161,7 +165,7 @@ ts_serie1 |>
 ```
 
 Nous pouvons faire quelques observations sur le graphique de l'ACF. Ce graphique nous permet de détecter une structure de corrélation du réseau. Dans notre cas, plusieurs autocorrélations présentent des valeurs significativement non nulles, ce qui signifie que la série chronologique n'est pas aléatoire.\
-Aussi, nous pouvons observer un nuage de points plutôt aligné, on peut donc se poser la question d'une éventuelle corrélation.
+Aussi, nous pouvons observer un nuage de points plutôt aligné, on peut donc se poser la question d'une éventuelle corrélation entre Yt et Yt-1.
 
 Afin d'avoir une analyse plus exhaustive, nous pouvons analyser l'ACF et la PACF. En effet, l'étude de l'ACF va nous permettre de détecter la périodicité de la série.
 
@@ -179,7 +183,7 @@ ts_serie_semaine <- ts(ts_serie1, frequency = 7)
 autoplot(ts_serie_semaine) # Visualisation des données
 ```
 
-Ayant choisi d'analyser notre série en série hebdomadaire, l'axe des abscisses change puisqu'il représente le nombre de semaines. Ainsi, entre 2020 et 2022, nous avons environ 100 semaines.
+Ayant choisi d'analyser notre série en série hebdomadaire, l'axe des abscisses change puisqu'il représente le nombre de semaines. Ainsi, entre 2020 et 2022, nous avons un peu plus de 100 semaines à analyser.
 
 ## Décomposition saisonnière
 
@@ -246,7 +250,7 @@ serie_diff |>
 ```
 
 Grâce à cette différenciation, nous avons supprimé la tendance et il ne nous reste plus que la saisonnalité. Les auto-corrélations nous confirment cette hypothèse car nous n'avons plus de fortes valeurs successives dans le graphique comme auparavant.\
-Normalement, notre série est bien devenue stationnaire puisque les valeurs sont centrées et fluctuent autour de 0.
+Notre série est bien devenue stationnaire puisque les valeurs sont centrées et fluctuent autour de 0.
 
 Suite à cette étape, nous allons tester la stationnarité de la série pour pouvoir continuer l'analyse en toute cohérence.
 
@@ -258,7 +262,7 @@ adf.test(serie_diff)
 kpss.test(serie_diff)
 ```
 
-En conclusion, notre série différenciée est bien stationnaire comme le prouve ces deux tests.
+En conclusion, notre série différenciée est bien stationnaire comme le prouvent ces deux tests.
 
 ## Bruit blanc
 
@@ -364,8 +368,6 @@ Dans un premier temps, nous nous sommes questionnés sur le processus ARMA pour 
 Ensuite, les modèles AR et MA étant des cas particuliers du modèle ARMA, nous les avons aussi écartés de notre analyse.\
 Enfin, nous avons donc choisi de réaliser un modèle ARIMA pour modéliser notre série.
 
-ma)
-
 ## Modèle auto ARIMA
 
 Afin de pouvoir estimer notre série, nous avons utiliser la fonction auto.arima() du package forecast qui permet d'effectuer une modélisation automatique. En précisant les arguments trace=T et ic=aic, nous avons donné la main au logiciel R de selectionner le meilleur modèle sur la base du critère AIC.
@@ -416,7 +418,7 @@ Puisque nous avons choisi le modèle auto ARIMA, nous allons étudier ses propri
 t_stat(model_arima)
 ```
 
-Grâce à la fonction t_stat() nous pouvons voir que les coefficients de notre modèle diffèrent beaucoup de 0, en particulier pour les coefficients ar1, ar2 et ar3. En effet, ceux-ci présentent une différence moyenne d'environ 50 de la valeur 0. Les valeurs p correspondantes sont toutes très proches de zéro (0.00000, 0.0000, 0.000001), ce qui suggère que les coefficients sont significativement différents de zéro.
+Grâce à la fonction t_stat() nous pouvons voir que les coefficients de notre modèle diffèrent beaucoup de 0, en particulier pour les coefficients ar1, ar2 et ar3. En effet, ceux-ci présentent une différence moyenne d'environ 50 de la valeur 0. Les valeurs p correspondantes sont toutes égales à 0, ce qui suggère que les coefficients sont significativement différents de zéro.
 
 Ensuite, pour que le modèle soit valide, il faut vérifier la normalité des résidus.
 
@@ -470,6 +472,18 @@ Nous pouvons observer les valeurs de ces prévisions :
 ```{r}
 predict(model_arima)
 ```
+
+La sortie que vous avez fournie semble être le résultat d'une prédiction pour les nouveaux cas de COVID-19 en France. Voici comment interpréter ces valeurs :
+
+1. Prédiction : La valeur de la prédiction est -146297.3. Cela suggère qu'avec les informations disponibles, le modèle prévoit qu'il y aura une diminution importante des nouveaux cas de COVID-19 en France à la période de temps spécifiée (probablement une semaine). Cependant, il est important de noter que cette valeur est négative, ce qui peut sembler inhabituel pour ce type de données.
+
+2. Erreur standard (se) : La valeur de l'erreur standard est de 6188.18. L'erreur standard est une mesure de la précision de la prédiction. Une valeur plus élevée indique une incertitude plus grande associée à la prédiction.
+
+Cependant, il est important de noter que la prédiction d'une diminution importante des nouveaux cas de COVID-19 en France avec une valeur négative soulève des questions quant à l'interprétation appropriée de cette sortie. Il est possible que le modèle ou les données utilisés ne soient pas adaptés à ce type de prédiction, ou qu'il y ait des erreurs dans la mise en œuvre du modèle.
+
+Il est recommandé de vérifier les étapes de prétraitement des données, de revoir les paramètres du modèle et de procéder à une analyse plus approfondie pour comprendre la signification de cette prédiction négative et pour évaluer la validité des résultats obtenus.
+
+# Voir avec Marie ce qu'on laisse dans le dossier
 
 La valeur de la prédiction est de -14697 , ce qui représente le niveau de la série temporelle attendu pour la période prédite.
 
@@ -526,7 +540,7 @@ lines(serie_diff2,col='orange',lwd=1)
 ```
 
 Ce graphique nous a permis de superposer la série initiale et les données prédites par le modèle.\
-Nous pouvons voir que les données prédites sont beaucoup plus faible car sur l'année 2022 nous avons eu une explosion du nombre de nouveaux cas et notre modèle ne le prévoit pas.
+Nous pouvons voir que les données prédites sont beaucoup plus faible car sur l'année 2022 nous avons eu une explosion du nombre de nouveaux cas et notre modèle ne le prévoit pas. Nous observons cependant que les pics de la série initiale et les pics des données prédites sont en adéquation et se superposent, même si la valeur est différente. 
 
 ## Lissage exponentiel simple
 
@@ -575,6 +589,6 @@ Grâce à ce graphique, nous pouvons voir que les prévisions émises avec le li
 
 # Conclusion
 
-En conclusion, notre analyse de l'évolution du nombre de Covid-19 entre 2021 et 2023 nous permet d'affirmer que les prévisions sont compliquées à mettre en place. Lors de cette période, nous avons eu des changements structurels avec la mise en place de confinements et de politiques sanitaires spécifiques à la pandémie, pouvant impacter le nombre de nouveaux cas de COVID-19. Ce sont des paramètres que nous ne pouvons prévoir mais qui sont très importants dans les modélisations sur le nombre de cas du COVID-19. \
+En conclusion, notre analyse de l'évolution du nombre de cas de Covid-19 en France entre 2021 et 2023 nous permet d'affirmer que les prévisions sont compliquées à mettre en place. Lors de cette période, nous avons eu des changements structurels avec la mise en place de confinements et de politiques sanitaires spécifiques à la pandémie, pouvant impacter le nombre de nouveaux cas de COVID-19. Ce sont des paramètres que nous ne pouvons prévoir mais qui sont très importants dans les modélisations sur le nombre de cas du COVID-19. \
 Par ailleurs, l'analyse de notre sous-série nous a permis de constater une saisonnalité hebdomadaire, avec un nombre de nouveaux cas en hausse tous les 7 jours. Après diverses représentations graphiques de la série, de ses propriétés, nous avons pu déterminer la méthode la plus adaptée pour modéliser notre série. Le processus ARIMA a semblé être le plus juste pour notre cas et nous a permis d'émettre des prévisions pour les 30 prochaines semaines, soit quasiment une année entière, l'année 2022.\
 Notre étude présente des limites, le caractère épidémique de notre série a pour conséquences de remettre en cause la fiabilité de nos prévisions. Un modèle SARIMA, prenant en compte la composante saisonnière de la série aurait pu aussi être envisagé.
