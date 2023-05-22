@@ -558,7 +558,7 @@ plot(serie_diff.hw, main = "Lissage de Holt-Winters", xlab = "Nombre de semaines
 ```
 
 Cette visualisation nous permet de voir que l'estimation de la tendance de notre série est très correcte.\
-En rouge, nous avons les valeurs prévues après le lissage exponentiel de Holt-Winters et en noir les valeurs initiales. Les deux courbe sont quasiment superposées, ce qui nous indique un bon ajustement. \
+En rouge, nous avons les valeurs prévues après le lissage exponentiel de Holt-Winters et en noir les valeurs initiales. Les deux courbes sont quasiment superposées, ce qui nous indique un bon ajustement. \
 Nous allons donc pouvoir émettre des prévisions sur notre série :
 
 ```{r}
@@ -567,7 +567,7 @@ plot(serie_diff,main="Prévisions des 30 prochaines semaines des nouveaux \ncas 
 lines(pred.hw,col="blue",lwd=1)
 ```
 
-Dans ce cas, les prévisions sont dans la continuité des données. Nous pouvons noter tout de même une légère décroissance pour les 30 prochaines semaines à venir.
+Dans ce cas, les prévisions sont dans la continuité des données. Nous pouvons noter une légère décroissance pour les 30 prochaines semaines à venir.
 
 ### Comparaison avec les données initiales
 
@@ -588,4 +588,4 @@ En conclusion, notre analyse de l'évolution du nombre de cas de COVID-19 en Fra
 La série a présenté une tendance à la hausse jusqu'à 2022 puis à la baisse par la suite, ainsi qu'une composante saisonnière, s'expliquant par l'arrivée de regroupements (fêtes de fin d'année, vacances...) ou encore par les vacances scolaires. \
 Par ailleurs, l'analyse de notre sous-série nous a permis de constater une saisonnalité hebdomadaire, avec un nombre de nouveaux cas en hausse tous les 7 jours. Après diverses représentations graphiques de la série, de ses propriétés, nous avons pu déterminer la méthode la plus adaptée pour modéliser notre série. Le processus ARIMA a semblé être le plus juste pour notre cas et nous a permis d'émettre des prévisions pour les 30 prochaines semaines, soit quasiment une année entière, l'année 2022.\
 Notre étude présente des limites, le caractère épidémique de notre série a pour conséquences de remettre en cause la fiabilité de nos prévisions. Un modèle SARIMA, prenant en compte la composante saisonnière de la série aurait pu aussi être envisagé. \
-Saisonnalité hebdomadaire car mélange de population ? pas compris 
+
