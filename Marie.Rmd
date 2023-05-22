@@ -1,11 +1,15 @@
 ---
 title: "Projet Covid"
 author : "Margaux Bailleul / Oriane Duclos / Marie Guibert" 
-output: pdf_document
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 2
 date: "`r Sys.Date()`"
 ---
 
-```{r message = FALSE}
+```{r message=FALSE, include=FALSE}
 library(tidyverse)
 library(forecast)
 library(tidyquant)
@@ -47,11 +51,9 @@ min(donnees_fr$date)
 max(donnees_fr$date)
 ```
 
-Grâce à cette étape, nous pouvons observer que notre série temporelle débute le 1er Mars 2020 et se termine le 19 Avril 2023. Notre étude a donc une plage d'environ de 3 ans.
+Grâce à cette étape, nous pouvons observer que notre série temporelle débute le 1er Mars 2020 et se termine le 19 Avril 2023. Notre étude a donc une plage d'environ 3 ans.
 
-## Transformation des données en série temporelle
-
-Premièrement, nous allons transformer nos données en séries temporelles pour pouvoir réaliser notre analyse.
+Nous allons transformer nos données en séries temporelles pour pouvoir réaliser notre analyse.
 
 ```{r}
 ts_donnees_fr <- ts(donnees_fr$new_cases,start = c(2020,1,3), frequency = 365)
