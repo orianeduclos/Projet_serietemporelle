@@ -15,6 +15,9 @@ library(tseries)
 library(lmtest)
 ```
 
+La pandémie mondiale de COVID-19 a eu un impact sans précédent sur les sociétés du monde entier, mettant à l'épreuve nos systèmes de santé, notre économie et notre façon de vivre. Comprendre l'évolution des cas de COVID-19 au fil du temps est essentiel pour évaluer l'efficacité des mesures prises et pour anticiper les tendances futures. Cette étude de série temporelle vise à apporter des connaissances approfondies sur les tendances des cas de COVID-19 en France. 
+
+
 # Importations des données 
 
 Tout d'abord, on importe les données et on sélectionne les données concernant la France. 
@@ -115,7 +118,7 @@ Nous avons choisi de scinder notre série en trois périodes :
 Nous pouvons maintenant les visualiser : 
 
 ```{r}
-plot(ts_serie1,main="Nouveaux cas de covid-19 en France entre 2020 et 2021")
+plot(ts_serie1,main="Nouveaux cas de covid-19 en France entre 2020 et 2022")
 ```
 Dans cette sous-série, nous pouvons observer une saisonnalité avec des pics lors de la fin de l'année, pouvant correspondre à la période hivernale mais aussi au niveau des vacances scolaires (vers le mois de Mars). Ce constat est expliqué par les déplacements de populations et les concentrations de personnes (réunions de famille, lieux festifs).
 
@@ -224,6 +227,38 @@ Ce second test nous permet aussi de confirmer notre hypothèse de non stationnar
 
 Ainsi, nous avons besoin de différencier la série pour poursuivre l'analyse puisque notre série n'est pas stationnaire. L'hypothèse de stationnarité va nous permettre d'avoir des estimations correctes et plus fiables. 
 
+## Différenciation
+
+Nous allons observer les autocorrélations partielles de la série pour savoir comment différencier notre série. La différenciation de la série va nous permettre de rendre la série stationnaire puisqu'elle diminue la variance, élimine la tendance et/ou la saisonnalité.
+
+```{r}
+pacf(ts_serie_semaine)
+```
+
+Ce graphique nous montre 3 pics importants, nous avons donc choisi de différencier 3 fois notre série. 
+
+```{r}
+serie_diff <- ts_serie_semaine |> 
+  diff(differences = 3) 
+serie_diff |> 
+  ggtsdisplay(plot.type="scatter")
+```
+
+Grâce à cette différenciation, nous avons supprimé la tendance et il ne nous reste plus que la saisonnalité. Les auto-corrélations nous confirment cette hypothèse car nous n'avons plus de fortes valeurs successives dans le graphique comme auparavant.\
+Normalement, notre série est bien devenue stationnaire puisque les valeurs sont centrées et fluctuent autour de 0.
+
+
+Suite à cette étape, nous allons tester la stationnarité de la série pour pouvoir continuer l'analyse en toute cohérence. 
+
+```{r}
+adf.test(serie_diff)
+```
+
+```{r}
+kpss.test(serie_diff)
+```
+
+En conclusion, notre série différenciée est bien stationnaire comme le prouve ces deux tests.
 
 ## Bruit blanc 
 
@@ -243,36 +278,7 @@ Box.test(ts_serie_semaine)
 
 Notre p-value est bien inférieure à 5%, la probabilité que la série soit un bruit blanc est presque nulle.
 
-
-## Différenciation
-
-Nous allons observer les autocorrélations partielles de la série pour savoir comment différencier notre série. La différenciation de la série va nous permettre de rendre la série stationnaire puisqu'elle diminue la variance, élimine la tendance et/ou la saisonnalité.
-
-```{r}
-pacf(ts_serie_semaine)
-```
-Ce graphique nous montre 3 pics importants, nous avons donc choisi de différencier 3 fois notre série. 
-
-```{r}
-serie_diff <- ts_serie_semaine |> 
-  diff(differences = 3) 
-serie_diff |> 
-  ggtsdisplay(plot.type="scatter")
-```
-Grâce à cette différenciation, nous avons supprimé la tendance et il ne nous reste plus que la saisonnalité. Les auto-corrélations nous confirment cette hypothèse car nous n'avons plus de fortes valeurs successives dans le graphique comme auparavant.\
-Normalement, notre série est bien devenue stationnaire puisque les valeurs sont centrées et fluctuent autour de 0.
-
-
-Suite à cette étape, nous allons tester la stationnarité de la série pour pouvoir continuer l'analyse en toute cohérence. 
-```{r}
-adf.test(serie_diff)
-```
-```{r}
-kpss.test(serie_diff)
-```
-En conclusion, notre série différenciée est bien stationnaire comme le prouve ces deux tests. 
-
-# Modélisation de notre série
+# Modélisation de notre série avec une méthode paramétrique
 
 Nous allons essayer de choisir le meilleur modèle afin d'estimer notre série.
 
@@ -335,10 +341,37 @@ lines(ts_serie1_lm$fitted.values,col="red")
 ```
 Cette représentation graphique nous permet de voir que le modèle polynomial ne semble pas être le plus adapté pour représenter la série chronologique. 
 
+# Modélisation de notre série avec une méthode non paramétrique 
+
+Après avoir réalisé un modèle polynomial, nous avons observé que ce "modèle simple" ne décrit pas bien la tendance observée. Nous avons choisi donc d'utiliser une méthode non paramétrique pour modéliser la série et la différenciation réalisée plus tôt dans notre étude. 
+
+## Estimation des coefficients p,d et q
+
+Pour ajuster le modèle aux données, nous allons essayer d'estimer les coefficients p d et q du modèle ARIMA.
+
+Premièrement, nous allons chercher le paramètre p, nombre de termes auto-régressifs. Nous avons choisi de déterminer p égal à 0.
+
+Deuxièmement, le paramètre d correspond au nombre de différenciations et nous allons tenter de le déterminer. Puisque notre série n'est pas stationnaire, d est égal à 1. Si nous avons une série déjà stationnarisée, nous aurions choisi 0.
+
+Dernièrement, nous allons trouver q, le nombre de termes de moyenne mobile. Grâce au graphique des auto-corrélations partielles, nous pouvons le choisir. Comme vu précédemment, nous avons déterminé q = 3.
+
+```{r}
+pacf(ts_serie_semaine)
+```
+
+
+
+Grâce à l'identification des paramètres des modèles et à la stationnarisation de notre série, nous allons pouvoir réaliser différents modèles. 
+
+Dans un premier temps, nous nous sommes questionnés sur le processus ARMA pour modéliser notre série. Pour se faire, nous aurions utilisé la série différenciée car pour réaliser un modèle ARMA, il est nécessaire d'avoir une série stationnaire. Cependant, la fonction de corrélation empirique présente des pics périodiques, cela nous montre donc que cette méthode n'est pas adaptée. \
+Ensuite, les modèles AR et MA étant des cas particuliers du modèle ARMA, nous les avons aussi écartés de notre analyse. \
+Enfin, nous avons donc choisi de réaliser un modèle ARIMA pour modéliser notre série.
+
+ma)
 
 ## Modèle auto ARIMA 
 
-Afin de pouvoir l'estimer, nous avons utiliser la fonction auto.arima() du package forecast qui permet d'effectuer une modélisation automatique. En précisant les arguments trace=T et ic=aic, nous avons donné la main au logiciel R de selectionner le meilleur modèle sur la base du critère AIC. 
+Afin de pouvoir estimer notre série, nous avons utiliser la fonction auto.arima() du package forecast qui permet d'effectuer une modélisation automatique. En précisant les arguments trace=T et ic=aic, nous avons donné la main au logiciel R de selectionner le meilleur modèle sur la base du critère AIC. 
 
 Nous avons établi un modèle ARIMA. Cependant, la seule condition pour que la modélisation soit correct est que la série temporelle modélisée doit être stationnaire. Cette hypothèse explique nos choix précédents de différenciation.
 
@@ -358,36 +391,10 @@ plot(ts_serie_semaine)
 lines(model_arima$fitted,col="red")
 ```
 
-
-### Validité du modèle
-
-```{r}
-t_stat(model_arima)
-```
-Grâce à la fonction t_stat() nous pouvons voir que les coefficients de notre modèle diffèrent beaucoup de 0, en particulier pour les coefficients ar1, ar2 et ar3. En effet, ceux-ci présentent une différence moyenne d'environ 50 de la valeur 0. Les valeurs p correspondantes sont toutes très proches de zéro (0.00000, 0.0000, 0.000001), ce qui suggère que les coefficients sont significativement différents de zéro.
-
-
-Pour que le modèle soit valide, il faut vérifier la normalité des résidus.
-
-```{r}
-shapiro.test(model_arima$residuals)
-```
-Le test de Shapiro-Wilk nous permet de prouver que cette hypothèse est bien respectée. 
-
 ## Modèle ARIMA 
 
-Pour ajuster le modèle aux données, nous allons essayer d'estimer les coefficients p d et q du modèle ARIMA.
+A présent, nous allons réaliser notre modèle ARIMA avec les paramètres p, d et q trouvés au début de cette section. 
 
-Premièrement, nous allons chercher le paramètre p, nombre de termes auto-régressifs. Nous avons choisi de déterminer p égal à 0.
-
-Deuxièmement, le paramètre d correspond au nombre de différenciations et nous allons tenter de le déterminer. Puisque notre série n'est pas stationnaire, d est égal à 1. Si nous avons une série déjà stationnarisée, nous aurions choisi 0.
-
-Dernièrement, nous allons trouver q, le nombre de termes de moyenne mobile. Grâce au graphique des auto-corrélations partielles, nous pouvons le choisir. Comme vu précédemment, nous avons déterminé q = 3.
-
-```{r}
-pacf(ts_serie_semaine)
-```
-Après ces différents choix, nous obtenons donc un modèle ARIMA tel que : 
 ```{r}
 modele_arima1 <- arima(ts_serie_semaine,order=c(0,1,3))
 summary(modele_arima1)
@@ -404,35 +411,58 @@ Nous aurons tendance à privilégier le modèle auto.ARIMA puisque les critères
 
 Il aurait été intéressant d'effectuer un test anova pour comparer les modèles. Cependant, nous ne pouvons pas utiliser la méthode anova() sur un objet de classe Arima. 
 
+# Validité du modèle choisi
 
+Puisque nous avons choisi le modèle auto ARIMA, nous allons étudier ses propriétés et vérifier qu'il soit bien valide.
+
+```{r}
+t_stat(model_arima)
+```
+Grâce à la fonction t_stat() nous pouvons voir que les coefficients de notre modèle diffèrent beaucoup de 0, en particulier pour les coefficients ar1, ar2 et ar3. En effet, ceux-ci présentent une différence moyenne d'environ 50 de la valeur 0. Les valeurs p correspondantes sont toutes très proches de zéro (0.00000, 0.0000, 0.000001), ce qui suggère que les coefficients sont significativement différents de zéro.
+
+
+Ensuite, pour que le modèle soit valide, il faut vérifier la normalité des résidus.
+
+```{r}
+shapiro.test(model_arima$residuals)
+```
+
+Le test de Shapiro-Wilk nous permet de prouver que cette hypothèse est bien respectée au seuil de 5%.
 
 # Etude des résidus 
 
 La fonction Box.test examine l’hypothèse nulle de nullité des H premières auto-covariance.
 Par défaut H est fixé à 1, et seule la nullité de l’auto-covariance d’ordre 1 est testée.
 
-Pour tester si la série peut-être apparentée à un bruit blanc, nous fixerons un H de l’ordre de 7.
+Pour tester si la modélisation de la série peut-être apparentée à un bruit blanc, nous fixerons un H de l’ordre de 7.
 
 ```{r}
-Box.test(ts_serie_semaine,lag=7)
+Box.test(model_arima$coef)
 ```
 Puisque la p-value est inférieure à 5%, on rejette l'hypothèse de non-autocorrélation. Cela implique que la série temporelle présente une autocorrélation significative et que les valeurs successives de la série temporelle sont dépendantes les unes des autres.
 
 La fonction ks.test() est une fonction de test de Kolmogorov-Smirnov dans R, qui permet de comparer une distribution empirique à une distribution théorique normale.
 
 ```{r}
-ks.test(ts_serie_semaine, "pnorm", mean(ts_serie_semaine), sd(ts_serie_semaine))
+ks.test(model_arima$coef, "pnorm", mean(model_arima$coef), sd(model_arima$coef))
 ```
-Les données ne suivent pas une distribution théorique car la p-value est inférieure à 5%. On rejette donc l'hypothèse nulle.
+Les données suivent une distribution théorique car la p-value est supérieure à 5%. On accepte donc l'hypothèse nulle.
+
+Avec cette visualisation, le fait que les résidus suivent bien une loi normale est confirmé. 
+```{r}
+hist(model_arima$residuals,breaks=50,freq=FALSE)
+```
 
 
 # Prévisions 
 
-Suite à notre analyse, nous avons utilisé la fonction forecast pour émettre des prévisions sur notre série pour les 100 prochains jours (en fixant h = 100).
+## Avec forecast
+
+Suite à notre analyse, nous avons utilisé la fonction forecast pour émettre des prévisions sur notre série pour les 30 prochaines semaines (en fixant h = 30).
 
 ```{r}
-forecast_cases <- forecast::forecast(model_arima, h = 100)
-plot(forecast_cases)
+forecast_cases <- forecast::forecast(model_arima, h = 30)
+autoplot(forecast_cases,main="Prévisions des nouveaux cas de COVID-19 pour les 30 prochaines semaines")
 ```
 Nous pouvons observer des prévisions assez stables dans le temps. Cependant, nos données correspondant à une pandémie, les prévisions sont d'autant plus compliquées à émettre. 
 
@@ -442,47 +472,35 @@ Nous pouvons observer les valeurs de ces prévisions :
 predict(model_arima)
 ```
 
+La valeur de la prédiction est de -14697 , ce qui représente le niveau de la série temporelle attendu pour la période prédite. 
+
+La deuxième partie de la sortie ($se) donne l'erreur standard de la prédiction, qui est de 6188.18. Cela indique la précision de la prédiction et permet d'estimer l'intervalle de confiance autour de la valeur prédite.
+
+### Comparaison avec les données initiales
+
 Afin de rendre notre analyse plus pertinente, nous allons pouvoir comparer si nos prévisions sont en adéquation avec la deuxième sous-série. 
 
-# ANALYSER AVEC LA DEUXIEME SOUS SERIE --> REUSSIR A FAIRE LE GRAPHIQUE 
+Tout d'abord, nous allons créer la série qui nous intéresse, c'est-à-dire avant le 1er Mai 2023. 
 
 ```{r}
-plot(forecast_cases)
-
-# lines(ts_seri2,col="red")
-```
-
-
-
-
-## Lissage exponentiel
-
-Nous allons tenter de réaliser des prévisions avec un lissage exponentiel : 
-
-```{r}
-les <- ets(ts_serie_semaine,model="ANN")
-pred <- predict(les)
-plot(pred)
-```
-
-# A INTERPRETER !!
-
-
-# MODIF TS_SERIE_2
-
-```{r}
-ts_serie_semaine2 <- ts(ts_serie2, frequency = 7)
-autoplot(ts_serie_semaine2) # Visualisation des données
+serie4 <- donnees_fr |> 
+  filter(date<="2023-01-05")
 ```
 
 
 ```{r}
-pacf(ts_serie_semaine2)
+ts_semaine_fr <- na.omit(ts(serie4$new_cases, frequency = 7))
+autoplot(ts_semaine_fr) # Visualisation des données
+```
+
+
+```{r}
+pacf(ts_semaine_fr)
 ```
 Il faut différencier la série 3 fois.
 
 ```{r}
-serie_diff2 <- ts_serie_semaine2 |> 
+serie_diff2 <- ts_semaine_fr |> 
   diff(differences = 3) 
 serie_diff2 |> 
   ggtsdisplay(plot.type="scatter")
@@ -497,11 +515,59 @@ La p-value associée au test de Dickey-Fuller est inférieure à 5%, cela nous p
 Nous allons donc pouvoir comparer nos prévisions à cette partie de la série pour vérifier la cohérence de nos prévisions.
 
 ```{r}
-plot(forecast_cases)
-lines(serie_diff2,col="red")
+plot(forecast_cases,main="Prévisions des 30 prochaines semaines des nouveaux \ncas de COVID-19 en France",col="black")
 ```
+
+Nous allons faire un zoom sur la fin de la série pour observer la cohérence avec les données initiales. 
+
+
 ```{r}
-serie_diff2
+plot(forecast_cases,main="Prévisions des 30 prochaines semaines des nouveaux \ncas de COVID-19 en France",lwd=2,col="black",xlim=c(90,120))
+lines(serie_diff2,col='orange',lwd=1)
 ```
+Ce graphique nous a permis de superposer la série initiale et les données prédites par le modèle.\
+Nous pouvons voir que les données prédites sont beaucoup plus faible car sur l'année 2022 nous avons eu une explosion du nombre de nouveaux cas et notre modèle ne le prévoit pas. 
 
+## Lissage exponentiel simple
 
+Nous aurions aussi pu tenter des réaliser des prévisions avec un lissage exponentiel : 
+
+```{r}
+les <- ets(ts_serie_semaine,model="ANN")
+pred <- forecast(les,h=30)
+plot(pred,main="Prévisions des 30 prochaines semaines des nouveaux \ncas de COVID-19 en France")
+```
+Ici nous n'avons pas besoin de comparer les prévisions avec les données initiales puisque nous concluons directement de la non pertinence de celles-ci. En effet, elles ne suivent pas du tout la tendance ni la saisonnalité. 
+
+## Lissage de Holt-Winters
+
+Nous allons aussi essayer de réaliser un lissage de Holt Winters. 
+
+```{r}
+serie_diff.hw <- HoltWinters(serie_diff)
+plot(serie_diff.hw)
+```
+Cette visualisation nous permet de voir que l'estimation de la tendance de notre série est très correcte. \
+Nous allons donc pouvoir émettre des prévisions sur celle-ci : 
+
+```{r}
+pred.hw <- predict(serie_diff.hw,n.ahead=30)
+plot(serie_diff,main="Prévisions des 30 prochaines semaines des nouveaux \ncas de COVID-19 en France")
+lines(pred.hw,col="blue",lwd=1)
+```
+Dans ce cas, les prévisions sont dans la continuité des données. Nous pouvons noter tout de même une légère décroissance pour les 100 prochaines semaines à venir. 
+
+### Comparaison avec les données initiales
+
+Nous allons comparer les résultats obtenus pour les prévisions et les données que nous avons. 
+```{r}
+pred.hw <- predict(serie_diff.hw,n.ahead=100)
+plot(serie_diff,main="Prévisions des 100 prochaines semaines des nouveaux \ncas de COVID-19 en France",xlim=c(90,120),lwd=2)
+lines(pred.hw,col="blue",lwd=2)
+lines(serie_diff2,col='orange',lwd=1)
+```
+Grâce à ce graphique, nous pouvons voir que les prévisions émises avec le lissage de Holt-Winters sont plus faibles que les données réelles. En effet, comme nous l'avons précisé ci-dessus, nous avons eu une explosion des cas en 2022 et notre lissage ne le prévoit pas. 
+
+# Conclusion
+
+En conclusion, 
